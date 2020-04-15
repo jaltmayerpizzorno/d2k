@@ -78,7 +78,7 @@ included here for convenience.
 
 ## Other Darknet and YOLO
 
-Others came before me and did great things.  Here are some of them:
+Others came before me (and did great things).  Here are some of them:
 
 - [Darknet YOLO project](https://pjreddie.com/darknet/yolo/)
 - [Darknet on GitHub](https://github.com/pjreddie/darknet)
