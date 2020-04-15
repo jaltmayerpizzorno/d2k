@@ -68,8 +68,8 @@ included here for convenience.
 
 Others came before me and did great things.  Here are some:
 
-- [Darknet project page](https://pjreddie.com/darknet/yolo/)
+- [Darknet YOLO project](https://pjreddie.com/darknet/yolo/)
 - [Darknet on GitHub](https://github.com/pjreddie/darknet)
-- [Allan Zellener's Yolo9k](https://github.com/allanzelener/YAD2K)
+- [Allan Zellener's YAD2K for Yolo9000](https://github.com/allanzelener/YAD2K)
 - [Ultralytics' YOLOv3 in PyTorch](https://github.com/ultralytics/yolov3)
 - [Huynh Ngoc Anh's YOLOv3 in Keras](https://github.com/experiencor/keras-yolo3)
