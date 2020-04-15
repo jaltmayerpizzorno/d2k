@@ -4,14 +4,14 @@
 
 ## Welcome to d2k
 
-D2K reimplements the [YOLOv3][https://pjreddie.com/media/files/papers/YOLOv3.pdf] object detection algorithm
+D2K reimplements the [YOLOv3](https://pjreddie.com/media/files/papers/YOLOv3.pdf) object detection algorithm
 by Joseph Redmon and Ali Farhadi in Keras/TensorFlow 2.1.0.
-Most everything was implemented test-first and matches [Darknet][https://github.com/pjreddie/darknet]
+Most everything was implemented test-first and matches [Darknet](https://github.com/pjreddie/darknet)
 (allowing for floating point imprecision fun).
 
 D2K is inference-only so far...  I'll look into adding training as time allows.
 
-![Sample YOLOv3 detections for COCO classes](etc/dog-detections.png)
+![Sample YOLOv3 detections for COCO classes](etc/dog-detection.png)
 
 ## Quick Start
 
@@ -31,9 +31,9 @@ python yolov3.py tests/data/dog.png
 ### To run the tests
 
 For the tests, you'll need Darknet built on `../darknet`.  You can use the
-[original][https://github.com/pjreddie/darknet], but you may want to use
-[my clone][https://github.com/jaltmayerpizzorno/darknet] given a couple of
-bugs I fixed (I found them while coding this project -- aren't tests wonderful?).
+[original](https://github.com/pjreddie/darknet), but you may want to use
+[my clone](https://github.com/jaltmayerpizzorno/darknet) given a couple of
+small bugs I fixed (found while coding this project -- aren't tests wonderful?).
 ```bash
 cd ..
 git clone https://github.com/jaltmayerpizzorno/darknet.git
@@ -67,8 +67,8 @@ The files under `darknet` are all originally from Darknet, included here for con
 
 Others came before me and did great things.  Here are some:
 
-- [Darknet project page][https://pjreddie.com/darknet/yolo/]
-- [Darknet on github][https://github.com/pjreddie/darknet]
-- [Allan Zellener's Yolo9k][https://github.com/allanzelener/YAD2K]
-- [Ultralytics' YOLOv3 in PyTorch][https://github.com/ultralytics/yolov3]
-- [Huynh Ngoc Anh's YOLOv3 in Keras][https://github.com/experiencor/keras-yolo3]
+- [Darknet project page](https://pjreddie.com/darknet/yolo/)
+- [Darknet on github](https://github.com/pjreddie/darknet)
+- [Allan Zellener's Yolo9k](https://github.com/allanzelener/YAD2K)
+- [Ultralytics' YOLOv3 in PyTorch](https://github.com/ultralytics/yolov3)
+- [Huynh Ngoc Anh's YOLOv3 in Keras](https://github.com/experiencor/keras-yolo3)
