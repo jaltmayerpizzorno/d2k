@@ -13,18 +13,19 @@ if len(sys.argv) < 2:
 
 image_file = sys.argv[1]
 
-if (Path('yolov3.h5').exists()):
-    model = keras.models.load_model('yolov3.h5', custom_objects={'Yolo': d2k.layers.Yolo})
+saved_model = Path('yolov3.h5')
+
+if (saved_model.exists()):
+    model = keras.models.load_model(saved_model, custom_objects={'Yolo': d2k.layers.Yolo})
 else:
     network = d2k.network.load(Path('darknet/yolov3.cfg').read_text())
     model = network.make_model(Path('darknet/yolov3.weights').read_bytes())
-    model.save('yolov3.h5')
+    model.save(saved_model)
 
 image = d2k.image.load(image_file)
 boxes = d2k.network.detect_image(model, image)
 
-with open('darknet/coco.names', 'r') as f:
-    names = f.read().splitlines()
+names = Path('darknet/coco.names').read_text().splitlines()
 
 for b in boxes:
     print(f'{str(b.corners()):<25}', ' '.join([f'{names[i]} {c:>5.2f}' for i, c in enumerate(b.classes) if c > 0.]))
