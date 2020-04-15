@@ -1,0 +1,7 @@
+**/__pycache__
+**/.pytest_cache
+tests/cache/*
+*.tar.bz2
+**/*.swp
+helper.so
+yolov3.h5
