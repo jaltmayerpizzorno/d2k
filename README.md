@@ -36,7 +36,7 @@ image = d2k.image.load(image_file)
 boxes = d2k.network.detect_image(model, image)
 
 im = Image.open(image_file)
-d2k.box.draw_boxes(im, boxes, names=names)
+d2k.box.draw_boxes(im, boxes)
 im.show()
 ```
 
@@ -78,7 +78,7 @@ included here for convenience.
 
 ## Other Darknet and YOLO
 
-Others came before me and did great things.  Here are some:
+Others came before me and did great things.  Here are some of them:
 
 - [Darknet YOLO project](https://pjreddie.com/darknet/yolo/)
 - [Darknet on GitHub](https://github.com/pjreddie/darknet)
