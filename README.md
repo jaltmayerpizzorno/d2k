@@ -15,8 +15,8 @@ D2K is inference-only so far...  I'll look into adding training as time allows.
 
 ## Quick Start
 
-The YOLOv3 weights file is too big for github, so you'll need to get it from the
-Darknet site:
+The YOLOv3 weights file is too big for GitHub, so after cloning this repository you'll
+need to get it from the Darknet site:
 ```bash
 pushd darknet
 wget https://pjreddie.com/media/files/yolov3.weights
@@ -35,7 +35,7 @@ For the tests, you'll need Darknet built on `../darknet`.  You can use the
 [my clone](https://github.com/jaltmayerpizzorno/darknet) given a couple of
 small bugs I fixed (found while coding this project -- aren't tests wonderful?).
 ```bash
-cd ..
+pushd ..
 git clone https://github.com/jaltmayerpizzorno/darknet.git
 cd darknet
 make
@@ -43,20 +43,21 @@ make
 
 Then return to D2K and simply `make test`:
 ```bash
-cd ../d2k
+popd
 make test
 ```
 
 ## More Information
 
-The `Network` class reads a Darknet configuration file and generates an equivalent Keras
-model;  its `convert` outputs a list of Python statements building the model, making it
+The `d2k.network.Network` class reads a Darknet configuration file and generates an equivalent
+Keras model;  its `convert()` outputs a list of Python statements building the model, making it
 easy to check (and incorporate elsewhere if desired).  It can also read Darknet YOLOv3
 weights into the resulting model, for use and/or for saving as an `.h5` file.
 
 Some of the computation is done in a custom Keras layer.
 
-The files under `darknet` are all originally from Darknet, included here for convenience.
+The files under `darknet` are all originally from [Darknet](https://github.com/pjreddie/darknet),
+included here for convenience.
 
 ## TODOs
 
@@ -68,7 +69,7 @@ The files under `darknet` are all originally from Darknet, included here for con
 Others came before me and did great things.  Here are some:
 
 - [Darknet project page](https://pjreddie.com/darknet/yolo/)
-- [Darknet on github](https://github.com/pjreddie/darknet)
+- [Darknet on GitHub](https://github.com/pjreddie/darknet)
 - [Allan Zellener's Yolo9k](https://github.com/allanzelener/YAD2K)
 - [Ultralytics' YOLOv3 in PyTorch](https://github.com/ultralytics/yolov3)
 - [Huynh Ngoc Anh's YOLOv3 in Keras](https://github.com/experiencor/keras-yolo3)
