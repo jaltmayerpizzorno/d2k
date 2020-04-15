@@ -28,6 +28,18 @@ You shouldn't have to install anything.  On an Python 3, Tensorflow 2 environmen
 python yolov3.py tests/data/dog.png
 ```
 
+In Python, using it is as simple as, for example,
+```python
+network = d2k.network.load(Path('darknet/yolov3.cfg').read_text())
+model = network.make_model(Path('darknet/yolov3.weights').read_bytes())
+image = d2k.image.load(image_file)
+boxes = d2k.network.detect_image(model, image)
+
+im = Image.open(image_file)
+d2k.box.draw_boxes(im, boxes, names=names)
+im.show()
+```
+
 ### To run the tests
 
 For the tests, you'll need Darknet built on `../darknet`.  You can use the
