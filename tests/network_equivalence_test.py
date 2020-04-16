@@ -216,7 +216,7 @@ def test_shortcut(tmp_path):
         "activation=linear"
     ])
 
-    compare_dn_to_keras(tmp_path, cfg_text, decimal=5) # XXX why the low accuracy?
+    compare_dn_to_keras(tmp_path, cfg_text, decimal=5) # XXX why the high error?
 
 
 def test_route_single_layers(tmp_path):
@@ -277,7 +277,7 @@ def test_route_multiple_layers(tmp_path):
         "layers=-1,-2",
     ])
 
-    compare_dn_to_keras(tmp_path, cfg_text, decimal=5) # XXX why the low accuracy?
+    compare_dn_to_keras(tmp_path, cfg_text, decimal=5) # XXX why the high error?
 
 
 #@pytest.mark.skip()
@@ -494,7 +494,7 @@ def test_yolo(tmp_path, size, classes, mask):
     k_output = k.predict(np.expand_dims(net_input, axis=0)).squeeze(axis=0)
     print("k_output=", k_output, "shape:", k_output.shape)
 
-    np.testing.assert_almost_equal(k_output, dn_output, decimal=5) # XXX why the low accuracy?
+    np.testing.assert_almost_equal(k_output, dn_output, decimal=5) # XXX why the high error?
 
 
 @pytest.mark.parametrize("use_dn_image", [True, False])
@@ -518,7 +518,7 @@ def test_predict_image(tmp_path, use_dn_image):
 
     height, width, _ = network.input_shape()
 
-    image = Image.fromarray(np.random.randint(0, 255, (300, 300, 3)), 'RGB')
+    image = Image.fromarray(np.random.randint(0, 256, (300, 300, 3), dtype=np.uint8), 'RGB')
     image_file = tmp_path / "image.bmp"
     with open(image_file, "wb") as f:
         image.save(f, format='BMP')
@@ -535,7 +535,7 @@ def test_predict_image(tmp_path, use_dn_image):
     k_output = k.predict(np.expand_dims(k_image, axis=0)).squeeze(axis=0)
 
     # d2k.image.resize introduces differences, hence the lower bar
-    np.testing.assert_almost_equal(k_output, dn_output, decimal=(6 if use_dn_image else 4))
+    np.testing.assert_almost_equal(k_output, dn_output, decimal=(5 if use_dn_image else 3))
 
 
 def darknet_compute(cfg_file, image_file):

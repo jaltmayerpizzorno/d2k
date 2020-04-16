@@ -7,7 +7,7 @@
 D2K reimplements the [YOLOv3](https://pjreddie.com/media/files/papers/YOLOv3.pdf) object detection algorithm
 by Joseph Redmon and Ali Farhadi in Keras/TensorFlow 2.1.0.
 Most everything was implemented test-first and matches [Darknet](https://github.com/pjreddie/darknet)
-(allowing for floating point imprecision fun).
+(allowing for floating point error fun).
 
 D2K is inference-only so far...  I'll look into adding training as time allows.
 
