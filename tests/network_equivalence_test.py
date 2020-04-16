@@ -106,7 +106,7 @@ def make_networks(tmp_path, cfg_text):
     return (dn, k, network)
 
 
-def compare_dn_to_keras(tmp_path, cfg_text):
+def compare_dn_to_keras(tmp_path, cfg_text, decimal=8):
     dn, k, network = make_networks(tmp_path, cfg_text)
 
     net_input = rand_float32(network.input_shape())
@@ -123,9 +123,8 @@ def compare_dn_to_keras(tmp_path, cfg_text):
     k_output = [x.squeeze(axis=0) for x in k_output]
     print("k_output=", k_output, "shape:", [x.shape for x in list(k_output)])
 
-    # XXX decimal=6 or 7 would be better...
     for dn_out, k_out in zip(dn_output, k_output):
-        np.testing.assert_almost_equal(k_out, dn_out, decimal=5)
+        np.testing.assert_almost_equal(k_out, dn_out, decimal=decimal)
 
 
 def test_read_weights_not_0_2(tmp_path):
@@ -172,7 +171,7 @@ def test_convolutional(tmp_path, size, stride, pad, activation, bn):
         f"activation={activation}",
     ])
 
-    compare_dn_to_keras(tmp_path, cfg_text)
+    compare_dn_to_keras(tmp_path, cfg_text, decimal=6)
 
 
 # size=1 stride>1 not supported by darknet
@@ -217,7 +216,7 @@ def test_shortcut(tmp_path):
         "activation=linear"
     ])
 
-    compare_dn_to_keras(tmp_path, cfg_text)
+    compare_dn_to_keras(tmp_path, cfg_text, decimal=5) # XXX why the low accuracy?
 
 
 def test_route_single_layers(tmp_path):
@@ -250,7 +249,7 @@ def test_route_single_layers(tmp_path):
         "activation=leaky",
     ])
 
-    compare_dn_to_keras(tmp_path, cfg_text)
+    compare_dn_to_keras(tmp_path, cfg_text, decimal=6)
 
 
 def test_route_multiple_layers(tmp_path):
@@ -278,7 +277,7 @@ def test_route_multiple_layers(tmp_path):
         "layers=-1,-2",
     ])
 
-    compare_dn_to_keras(tmp_path, cfg_text)
+    compare_dn_to_keras(tmp_path, cfg_text, decimal=5) # XXX why the low accuracy?
 
 
 #@pytest.mark.skip()
@@ -495,7 +494,7 @@ def test_yolo(tmp_path, size, classes, mask):
     k_output = k.predict(np.expand_dims(net_input, axis=0)).squeeze(axis=0)
     print("k_output=", k_output, "shape:", k_output.shape)
 
-    np.testing.assert_almost_equal(k_output, dn_output, decimal=5)
+    np.testing.assert_almost_equal(k_output, dn_output, decimal=5) # XXX why the low accuracy?
 
 
 @pytest.mark.parametrize("use_dn_image", [True, False])
