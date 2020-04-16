@@ -381,51 +381,10 @@ def load(cfg):
     return Network.load(cfg)
 
 
-def _correct_boxes(box, img_dim, net_dim):
-    x, y, w, h = box
-    img_w, img_h = img_dim
-    net_w, net_h = net_dim
-
-    # We need to try to keep computations using float32/int32 to stay
-    # as close to darknet as possible.
-    assert x.dtype == np.float32
-    assert y.dtype == np.float32
-    assert w.dtype == np.float32
-    assert h.dtype == np.float32
-    assert img_w.dtype == np.int32
-    assert img_h.dtype == np.int32
-    assert net_w.dtype == np.int32
-    assert net_h.dtype == np.int32
-
-    # this reverses the effect of dk2.image.letterbox
-    if (net_w/img_w) < (net_h/img_h):
-        new_w = net_w
-        new_h = (img_h * net_w) // img_w
-    else:
-        new_h = net_h
-        new_w = (img_w * net_h) // img_h
-
-    new_h = new_h.astype(np.float32)
-    new_w = new_w.astype(np.float32)
-    net_h = net_h.astype(np.float32)
-    net_w = net_w.astype(np.float32)
-
-    x = (x - (net_w - new_w)/np.float32(2.)/net_w) / (new_w/net_w)
-    y = (y - (net_h - new_h)/np.float32(2.)/net_h) / (new_h/net_h)
-    w *= (net_w / new_w)
-    h *= (net_h / new_h)
-
-    x *= img_w
-    w *= img_w
-    y *= img_h
-    h *= img_h
-
-    return (x, y, w, h)
-
-
-def get_network_boxes_old(output, config, img_dim, thresh=.5):
-    boxes = []
-
+def post_just_activate(output, config):
+    """Performs the steps our Yolo layer normally performs (with just_activate=False) but Darknet's doesn't.
+       Really just intended to facilitate testing.
+    """
     yolo_config = [layer[1] for layer in config if layer[0] == '[yolo]']
 
     # We need to try to keep computations using float32/int32 to stay
@@ -434,44 +393,34 @@ def get_network_boxes_old(output, config, img_dim, thresh=.5):
     net_width = np.int32(config[0][1]['width'])
     net_height = np.int32(config[0][1]['height'])
 
-    img_dim = np.array([*img_dim], dtype=np.int32)
-
+    result = []
     for l_out, l in zip(output, yolo_config):
         l_h, l_w = l_out.shape[0], l_out.shape[1]
         l_m = len(l['mask'])
         l_out = l_out.reshape((l_h, l_w, l_m, l['classes']+4+1))
 
-        l_anchors_w = np.array([l['anchors'][x][0] for x in l['mask']], dtype=np.float32).reshape(1,1,l_m)
-        l_anchors_h = np.array([l['anchors'][x][1] for x in l['mask']], dtype=np.float32).reshape(1,1,l_m)
-
-        objectness = l_out[...,4]
-        # TODO skip computations if objectness < thresh
+        l_anchors_w = np.array([l['anchors'][x][0] for x in l['mask']], dtype=np.float32).reshape(1,1,l_m,1)
+        l_anchors_h = np.array([l['anchors'][x][1] for x in l['mask']], dtype=np.float32).reshape(1,1,l_m,1)
 
         # x = (col + l_out[row, col, m, 0]) / l_w
-        x = (l_out[...,0] + np.arange(l_w, dtype=np.float32).reshape(1, l_w, 1)) / l_w
+        x = (l_out[...,0:1] + np.arange(l_w, dtype=np.float32).reshape(1,l_w,1,1)) / l_w
 
         # y = (row + l_out[row, col, m, 1]) / l_h
-        y = (l_out[...,1] + np.arange(l_h, dtype=np.float32).reshape(l_h, 1, 1)) / l_h
+        y = (l_out[...,1:2] + np.arange(l_h, dtype=np.float32).reshape(l_h,1,1,1)) / l_h
 
         # w = np.exp(l_out[row, col, m, 2]) * l_anchors[m][0] / net_width
-        w = (np.exp(l_out[...,2], dtype=np.float32) * l_anchors_w) / net_width
+        w = (np.exp(l_out[...,2:3], dtype=np.float32) * l_anchors_w) / net_width
 
         # h = np.exp(l_out[row, col, m, 3]) * l_anchors[m][1] / net_height
-        h = (np.exp(l_out[...,3], dtype=np.float32) * l_anchors_h) / net_height
+        h = (np.exp(l_out[...,3:4], dtype=np.float32) * l_anchors_h) / net_height
 
         # classes = l_out[row, col, m, 5:] * objectness
-        classes = l_out[..., 5:] * objectness.reshape(l_h,l_w,l_m,1)
-        classes[classes < thresh] = 0
+        objectness = l_out[...,4:5]
+        classes = l_out[..., 5:] * objectness
 
-        got_obj = objectness >= thresh
-        objectness, x, y, w, h, classes = [a[got_obj] for a in [objectness, x, y, w, h, classes]]
+        result.append(np.concatenate([x, y, w, h, objectness, classes], axis=3))
 
-        x, y, w, h = _correct_boxes((x, y, w, h), img_dim, (net_width, net_height))
-
-        x, y, w, h, objectness = [np.expand_dims(a, 1) for a in [x, y, w, h, objectness]]
-        boxes.append(np.concatenate([x, y, w, h, objectness, classes], axis=1))
-
-    return np.concatenate(boxes, axis=0)
+    return result
 
 
 def boxes_from_output(output, net_dim, img_dim, thresh=.5):
@@ -483,6 +432,48 @@ def boxes_from_output(output, net_dim, img_dim, thresh=.5):
        img_dim -- original image input dimensions as (width, height)
        thresh -- class detection threshold (default: .5)
     """
+
+    def _correct_boxes(box, img_dim, net_dim):
+        x, y, w, h = box
+        img_w, img_h = img_dim
+        net_w, net_h = net_dim
+
+        # We need to try to keep computations using float32/int32 to stay
+        # as close to darknet as possible.
+        assert x.dtype == np.float32
+        assert y.dtype == np.float32
+        assert w.dtype == np.float32
+        assert h.dtype == np.float32
+        assert img_w.dtype == np.int32
+        assert img_h.dtype == np.int32
+        assert net_w.dtype == np.int32
+        assert net_h.dtype == np.int32
+
+        # this reverses the effect of dk2.image.letterbox
+        if (net_w/img_w) < (net_h/img_h):
+            new_w = net_w
+            new_h = (img_h * net_w) // img_w
+        else:
+            new_h = net_h
+            new_w = (img_w * net_h) // img_h
+
+        new_h = new_h.astype(np.float32)
+        new_w = new_w.astype(np.float32)
+        net_h = net_h.astype(np.float32)
+        net_w = net_w.astype(np.float32)
+
+        x = (x - (net_w - new_w)/np.float32(2.)/net_w) / (new_w/net_w)
+        y = (y - (net_h - new_h)/np.float32(2.)/net_h) / (new_h/net_h)
+        w *= (net_w / new_w)
+        h *= (net_h / new_h)
+
+        x *= img_w
+        w *= img_w
+        y *= img_h
+        h *= img_h
+
+        return (x, y, w, h)
+
 
     boxes = []
 

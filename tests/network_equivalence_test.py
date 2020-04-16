@@ -590,11 +590,14 @@ def test_round_boxes():
 def test_boxes_from_darknet_output(image_stem):
     image, dn_output, dn_boxes, _ = darknet_compute(yolov3_cfg, test_data_path / (image_stem + '.png'))
 
-    image_dim = (image.shape[1], image.shape[0])
-
     network = d2k.network.load(yolov3_cfg.read_text())
 
-    k_boxes = d2k.network.get_network_boxes_old(dn_output, network.config, image_dim)
+    image_dim = (image.shape[1], image.shape[0])
+    net_dim = (network.input_shape()[1], network.input_shape()[0])
+
+    dn_output = d2k.network.post_just_activate(dn_output, network.config)
+    k_boxes = d2k.network.boxes_from_output(dn_output, net_dim, image_dim)
+    k_boxes = np.array([b.to_list() for b in k_boxes], dtype=np.float32)
     print('k_boxes:', k_boxes)
 
     np.testing.assert_equal(round_boxes(k_boxes), round_boxes(dn_boxes))
@@ -603,7 +606,6 @@ def test_boxes_from_darknet_output(image_stem):
 @pytest.mark.parametrize("image_stem", ['zebra', 'dog'])
 def test_nms_from_darknet_boxes(image_stem):
     _, _, dn_boxes, dn_nms = darknet_compute(yolov3_cfg, test_data_path / (image_stem + '.png'))
-
 
     dn_boxes = d2k.box.boxes_from_array(dn_boxes)
     dn_nms = d2k.box.boxes_from_array(dn_nms)
@@ -623,39 +625,6 @@ def test_nms_from_darknet_boxes(image_stem):
                                                          (['zebra'],(48,90,234,267))]],
                                               ['dog',   [(['bicycle'],(99,122,590,447)),
                                                          (['truck'], (476,81,684,168)),
-                                                         (['dog'], (134,213,313,543))]]
-                         ])
-def test_yolov3_old(image, dn_result):
-    image_file = test_data_path / (image + '.png')
-
-    network = d2k.network.load(yolov3_cfg.read_text())
-    k = network.make_model(yolov3_weights.read_bytes(), just_activate_yolo=True)
-    names = coco_names.read_text().splitlines()
-
-    net_h, net_w, _ = network.input_shape()
-
-    image = d2k.image.load(image_file)
-    image_dim = (image.shape[1], image.shape[0])
-    image = d2k.image.letterbox(image, net_w, net_h)
-
-    k_output = k.predict(np.expand_dims(image, axis=0))
-    k_output = [x.squeeze(axis=0) for x in k_output]
-
-    k_boxes = d2k.network.get_network_boxes_old(k_output, network.config, image_dim)
-    k_boxes = d2k.box.nms_boxes(d2k.box.boxes_from_array(k_boxes))
-
-    k_result = [([names[i]], b.corners()) for b in k_boxes for i in range(len(names)) if b.classes[i] > 0]
-
-    assert sorted(dn_result) == sorted(k_result)
-
-
-# corners obtained from './darknet detect cfg/yolov3.cfg yolov3.weights filename'
-# (after adding code to print them)
-@pytest.mark.parametrize("image, dn_result", [['zebra', [(['zebra'],(335,104,557,268)),
-                                                         (['zebra'],(169,92,394,252)),
-                                                         (['zebra'],(48,90,234,267))]],
-                                              ['dog',   [(['bicycle'],(99,122,590,447)),
-                                                         (['truck'], (476,81,684,168)),
                                                          (['dog'], (134,213,313,543))]],
                                               # other than 'zebra' and 'dog', 'cats' is higher
                                               # than it is wide -- needed for letterbox / box correction coverage
@@ -663,6 +632,7 @@ def test_yolov3_old(image, dn_result):
                                                          (['cat'], (127,454,376,570))]]
                          ])
 @pytest.mark.parametrize("use_detect_image", [False, True])
+#@pytest.mark.skip()
 def test_yolov3(image, dn_result, use_detect_image):
     image_file = test_data_path / (image + '.png')
 
