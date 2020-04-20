@@ -1,5 +1,6 @@
+import tensorflow as tf
 import tensorflow.keras as keras
-import numpy as np
+import tensorflow.keras.backend as K
 
 
 class Yolo(keras.layers.Layer):
@@ -11,11 +12,12 @@ class Yolo(keras.layers.Layer):
         self.net_dims = net_dims
         super(Yolo, self).__init__(**kwargs)
 
-        self.anchors_w = np.array([a[0] for a in anchors], dtype=np.float32).reshape(1,1,1,len(anchors),1)
-        self.anchors_h = np.array([a[1] for a in anchors], dtype=np.float32).reshape(1,1,1,len(anchors),1)
+        self.anchors_w = K.constant([a[0] for a in anchors], dtype='float32', shape=(1,1,1,len(anchors),1))
+        self.anchors_h = K.constant([a[1] for a in anchors], dtype='float32', shape=(1,1,1,len(anchors),1))
 
-        self.net_height = np.int32(net_dims[0])
-        self.net_width = np.int32(net_dims[1])
+        self.net_height = K.constant(net_dims[0], dtype='float32')
+        self.net_width = K.constant(net_dims[1], dtype='float32')
+
 
     def get_config(self):
         config = super(Yolo, self).get_config().copy()
@@ -27,20 +29,23 @@ class Yolo(keras.layers.Layer):
         })
         return config
 
+
     def build(self, input_shape):
         super(Yolo, self).build(input_shape)
 
         self.l_h, self.l_w = input_shape[1], input_shape[2]
         self.l_a = len(self.anchors)
 
-        self.range_w = np.arange(self.l_w, dtype=np.float32).reshape(1, 1, self.l_w, 1, 1)
-        self.range_h = np.arange(self.l_h, dtype=np.float32).reshape(1, self.l_h, 1, 1, 1)
+        self.range_w = K.reshape(K.arange(start=0, stop=self.l_w, dtype='float32'), (1, 1, self.l_w, 1, 1))
+        self.range_h = K.reshape(K.arange(start=0, stop=self.l_h, dtype='float32'), (1, self.l_h, 1, 1, 1))
 
+
+    @tf.function(input_signature=[tf.TensorSpec([None, None, None, None], tf.float32)])
     def call(self, input):
-        input = keras.backend.reshape(input, shape=(-1, self.l_h, self.l_w, self.l_a, 4+1+self.classes))
+        input = K.reshape(input, shape=(-1, self.l_h, self.l_w, self.l_a, 4+1+self.classes))
         if self.just_activate:
             # that's how far Darknet takes it within the network (when not training)
-            return keras.backend.concatenate((
+            return K.concatenate((
                 keras.activations.sigmoid(input[...,:2]),   # x, y
                 input[...,2:4],
                 keras.activations.sigmoid(input[...,4:])    # objectness, array of class detections
@@ -53,4 +58,4 @@ class Yolo(keras.layers.Layer):
         h = (keras.activations.exponential(input[...,3:4]) * self.anchors_h) / self.net_height
         classes = keras.activations.sigmoid(input[...,5:]) * objectness
 
-        return keras.backend.concatenate((x, y, w, h, objectness, classes))
+        return K.concatenate((x, y, w, h, objectness, classes))
