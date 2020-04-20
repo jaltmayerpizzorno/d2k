@@ -42,7 +42,8 @@ im.show()
 
 ### To run the tests
 
-For the tests, you'll need Darknet built on `../darknet`.  You can use the
+For the tests, you'll need Darknet built on `../darknet`, as I embed it using
+[ctypes](https://docs.python.org/3/library/ctypes.html).  You can use the
 [original](https://github.com/pjreddie/darknet), but you may want to use
 [my clone](https://github.com/jaltmayerpizzorno/darknet) given a couple of
 small bugs I fixed (found while coding this project -- aren't tests wonderful?).
@@ -64,7 +65,7 @@ make test
 The `d2k.network.Network` class reads a Darknet configuration file and generates an equivalent
 Keras model;  its `convert()` outputs a list of Python statements building the model, making it
 easy to check (and incorporate elsewhere if desired).  It can also read Darknet YOLOv3
-weights into the resulting model, for use and/or for saving as an `.h5` file.
+weights into the resulting model, for use and/or for serializing for later use.
 
 Some of the computation is done in a custom Keras layer.
 
