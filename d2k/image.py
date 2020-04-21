@@ -29,10 +29,6 @@ def resize(image_array, new_w, new_h):
     # PIL's resizing yields enough of a difference in the yolov3 network output
     # that I thought it worthwhile to implement resizing the way Darknet does.
 
-    resized = np.empty((new_h, new_w, im_c))
-    part = np.empty((im_h, new_w, im_c))
-
-    w_scale = (np.float32(im_w-1) / np.float32(new_w-1))
     sx = np.arange(new_w-1, dtype=np.float32) * (np.float32(im_w-1) / np.float32(new_w-1))
     ix = sx.astype(np.int)
     dx = np.reshape(sx - ix.astype(np.float32), (1, new_w-1, 1))
