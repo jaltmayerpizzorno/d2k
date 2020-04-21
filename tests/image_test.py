@@ -41,7 +41,7 @@ def test_resize(tmp_path, width, height):
 
     assert np.max(k_image) <= 1.0   # normalized?
 
-    np.testing.assert_almost_equal(dn_image, k_image, decimal=4)
+    np.testing.assert_almost_equal(dn_image, k_image, decimal=7)
 
 
 @pytest.mark.parametrize("width, height", [(100,200), (200,100)])
@@ -60,5 +60,4 @@ def test_letterbox(tmp_path, width, height):
 
     assert np.max(k_image) <= 1.0   # normalized?
 
-    # The relatively high error here comes from resizing the image
-    np.testing.assert_almost_equal(dn_image, k_image, decimal=4)
+    np.testing.assert_almost_equal(dn_image, k_image, decimal=7)

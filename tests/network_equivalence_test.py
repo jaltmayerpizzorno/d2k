@@ -494,7 +494,7 @@ def test_yolo(tmp_path, size, classes, mask):
     k_output = k.predict(np.expand_dims(net_input, axis=0)).squeeze(axis=0)
     print("k_output=", k_output, "shape:", k_output.shape)
 
-    np.testing.assert_almost_equal(k_output, dn_output, decimal=5) # XXX why the high error?
+    np.testing.assert_almost_equal(k_output, dn_output, decimal=7)
 
 
 @pytest.mark.parametrize("use_dn_image", [True, False])
@@ -534,8 +534,7 @@ def test_predict_image(tmp_path, use_dn_image):
     dn_output = dn.predict(dn_image)
     k_output = k.predict(np.expand_dims(k_image, axis=0)).squeeze(axis=0)
 
-    # d2k.image.resize introduces differences, hence the lower bar
-    np.testing.assert_almost_equal(k_output, dn_output, decimal=(5 if use_dn_image else 3))
+    np.testing.assert_almost_equal(k_output, dn_output, decimal=5) # XXX why the high error?
 
 
 def darknet_compute(cfg_file, image_file):
