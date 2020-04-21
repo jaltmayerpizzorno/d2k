@@ -43,10 +43,10 @@ im.show()
 ### To run the tests
 
 For the tests, you'll need Darknet built on `../darknet`, as I embed it using
-[ctypes](https://docs.python.org/3/library/ctypes.html).  You can use the
-[original](https://github.com/pjreddie/darknet), but you may want to use
-[my clone](https://github.com/jaltmayerpizzorno/darknet) given a couple of
-small bugs I fixed (found while coding this project -- aren't tests wonderful?).
+[ctypes](https://docs.python.org/3/library/ctypes.html).  I suggest you use
+[my clone of Darknet](https://github.com/jaltmayerpizzorno/darknet) given a couple
+of small bugs I fixed (found while coding this project) and also an adjustment
+to gcc options.
 ```bash
 pushd ..
 git clone https://github.com/jaltmayerpizzorno/darknet.git
