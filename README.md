@@ -15,8 +15,10 @@ D2K is inference-only so far...  I'll look into adding training as time allows.
 
 ## Quick Start
 
-The YOLOv3 weights file is too big for GitHub, so after cloning this repository you'll
-need to get it from the Darknet site:
+The YOLOv3 weights file is too big for checking into GitHub directly, but
+if you have [Git LFS](https://git-lfs.github.com/) set up, cloning the repository
+should get you a copy.  Otherwise, after cloning you'll need to get it from the
+Darknet site:
 ```bash
 pushd darknet
 wget https://pjreddie.com/media/files/yolov3.weights
