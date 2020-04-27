@@ -18,7 +18,7 @@ def setup_function():
     np.random.seed(0)   # to make tests reproducible
 
 
-def rand_float32(shape, decimals=5):
+def rand_float32(shape, decimals=4):
     """Shortcut to generating random numbers.  Round them a bit to try to keep
     float32 errors low."""
     shape = [shape] if not isinstance(shape, tuple) else shape
@@ -51,15 +51,15 @@ class DummyWeightsWriter:
                 if batch_normalize:
                     # BN: y = ((x - mean) / sqrt(var + epsilon)) * gamma + beta
                     # Darknet saves (beta)(gamma)(mean)(var) (out_dim, in_dim, height, width)
-                    self.write_float32(rand_float32(filters))  # beta / 'bias'
-                    self.write_float32(rand_float32(filters))  # gamma / 'scale'
-                    self.write_float32(rand_float32(filters))  # mean
-                    self.write_float32(rand_float32(filters))  # var
+                    self.write_float32(rand_float32(filters))       # beta / 'bias'
+                    self.write_float32(.5 * rand_float32(filters))  # gamma / 'scale'
+                    self.write_float32(rand_float32(filters))       # mean
+                    self.write_float32(1.0 + .5 * rand_float32(filters))  # var
                 else:
                     # Darknet saves (bias) (out_dim, in_dim, height, width)
                     self.write_float32(rand_float32(filters))  # bias
 
-                self.write_float32(rand_float32((filters, in_dim, size, size)))
+                self.write_float32(.2 * rand_float32((filters, in_dim, size, size)))
 
                 in_dim = filters
 
@@ -115,16 +115,18 @@ def compare_dn_to_keras(tmp_path, cfg_text, decimal=8):
 
     dn_output = dn.predict(net_input)
     dn_output = [dn_output] if not isinstance(dn_output, list) else dn_output
-    print("dn_output=", dn_output, "shape:", [x.shape for x in list(dn_output)])
 
     k_output = k.predict(np.expand_dims(net_input, axis=0))
     k_output = [k_output] if not isinstance(k_output, list) else k_output
 
     k_output = [x.squeeze(axis=0) for x in k_output]
-    print("k_output=", k_output, "shape:", [x.shape for x in list(k_output)])
+
+    print("k-dn:", [x - y for x, y in zip(k_output, dn_output)])
 
     for dn_out, k_out in zip(dn_output, k_output):
         np.testing.assert_almost_equal(k_out, dn_out, decimal=decimal)
+         # NaN results aren't useful for assessing precision between DarkNet and our Keras net
+        assert not np.isnan(k_out).any()
 
 
 def test_read_weights_not_0_2(tmp_path):
@@ -158,9 +160,9 @@ def test_read_weights_not_0_2(tmp_path):
 def test_convolutional(tmp_path, size, stride, pad, activation, bn):
     cfg_text = '\n'.join([
         "[net]",
-        "height=3",
-        "width=3",
-        "channels=2",
+        "height=100",
+        "width=150",
+        "channels=3",
         "",
         "[convolutional]",
         f"batch_normalize={bn}",
@@ -179,9 +181,9 @@ def test_convolutional(tmp_path, size, stride, pad, activation, bn):
 def test_upsample(tmp_path, stride):
     cfg_text = '\n'.join([
         "[net]",
-        "height=3",
-        "width=3",
-        "channels=2",
+        "height=100",
+        "width=150",
+        "channels=3",
         "",
         "[upsample]",
         f"stride={stride}",
@@ -193,8 +195,8 @@ def test_upsample(tmp_path, stride):
 def test_shortcut(tmp_path):
     cfg_text = '\n'.join([
         "[net]",
-        "height=3",
-        "width=3",
+        "height=100",
+        "width=150",
         "channels=3",
         "",
         "[convolutional]",
@@ -216,14 +218,14 @@ def test_shortcut(tmp_path):
         "activation=linear"
     ])
 
-    compare_dn_to_keras(tmp_path, cfg_text, decimal=5) # XXX why the high error?
+    compare_dn_to_keras(tmp_path, cfg_text, decimal=6)
 
 
 def test_route_single_layers(tmp_path):
     cfg_text = '\n'.join([
         "[net]",
-        "height=3",
-        "width=3",
+        "height=100",
+        "width=150",
         "channels=3",
         "",
         "[convolutional]",
@@ -255,8 +257,8 @@ def test_route_single_layers(tmp_path):
 def test_route_multiple_layers(tmp_path):
     cfg_text = '\n'.join([
         "[net]",
-        "height=3",
-        "width=3",
+        "height=100",
+        "width=150",
         "channels=3",
         "",
         "[convolutional]",
@@ -277,189 +279,7 @@ def test_route_multiple_layers(tmp_path):
         "layers=-1,-2",
     ])
 
-    compare_dn_to_keras(tmp_path, cfg_text, decimal=5) # XXX why the high error?
-
-
-#@pytest.mark.skip()
-def test_bigger_net(tmp_path):
-    cfg_text = '\n'.join([
-        "[net]",
-        "width=608",
-        "height=608",
-        "channels=3",
-        "",
-        "[convolutional]",
-        "batch_normalize=1",
-        "filters=32",
-        "size=3",
-        "stride=1",
-        "pad=1",
-        "activation=leaky",
-        "",
-        "# Downsample",
-        "",
-        "[convolutional]",
-        "batch_normalize=1",
-        "filters=64",
-        "size=3",
-        "stride=2",
-        "pad=1",
-        "activation=leaky",
-        "",
-        "[convolutional]",
-        "batch_normalize=1",
-        "filters=32",
-        "size=1",
-        "stride=1",
-        "pad=1",
-        "activation=leaky",
-        "",
-        "[convolutional]",
-        "batch_normalize=1",
-        "filters=64",
-        "size=3",
-        "stride=1",
-        "pad=1",
-        "activation=leaky",
-        "",
-        "[shortcut]",
-        "from=-3",
-        "activation=linear",
-        "",
-        "# Downsample",
-        "",
-        "[convolutional]",
-        "batch_normalize=1",
-        "filters=128",
-        "size=3",
-        "stride=2",
-        "pad=1",
-        "activation=leaky",
-        "",
-        "[convolutional]",
-        "batch_normalize=1",
-        "filters=64",
-        "size=1",
-        "stride=1",
-        "pad=1",
-        "activation=leaky",
-        "",
-        "[convolutional]",
-        "batch_normalize=1",
-        "filters=128",
-        "size=3",
-        "stride=1",
-        "pad=1",
-        "activation=leaky",
-        "",
-        "[shortcut]",
-        "from=-3",
-        "activation=linear",
-        "",
-        "[convolutional]",
-        "batch_normalize=1",
-        "filters=64",
-        "size=1",
-        "stride=1",
-        "pad=1",
-        "activation=leaky",
-        "",
-        "[convolutional]",
-        "batch_normalize=1",
-        "filters=128",
-        "size=3",
-        "stride=1",
-        "pad=1",
-        "activation=leaky",
-        "",
-        "[shortcut]",
-        "from=-3",
-        "activation=linear",
-        "",
-        "# Downsample",
-        "",
-        "[convolutional]",
-        "batch_normalize=1",
-        "filters=256",
-        "size=3",
-        "stride=2",
-        "pad=1",
-        "activation=leaky",
-        "",
-        "[convolutional]",
-        "batch_normalize=1",
-        "filters=128",
-        "size=1",
-        "stride=1",
-        "pad=1",
-        "activation=leaky",
-        "",
-        "[convolutional]",
-        "batch_normalize=1",
-        "filters=256",
-        "size=3",
-        "stride=1",
-        "pad=1",
-        "activation=leaky",
-        "",
-        "[shortcut]",
-        "from=-3",
-        "activation=linear",
-        "",
-        "[convolutional]",
-        "batch_normalize=1",
-        "filters=128",
-        "size=1",
-        "stride=1",
-        "pad=1",
-        "activation=leaky",
-        "",
-        "[convolutional]",
-        "batch_normalize=1",
-        "filters=256",
-        "size=3",
-        "stride=1",
-        "pad=1",
-        "activation=leaky",
-        "",
-        "[shortcut]",
-        "from=-3",
-        "activation=linear",
-        "",
-        "[convolutional]",
-        "batch_normalize=1",
-        "filters=128",
-        "size=1",
-        "stride=1",
-        "pad=1",
-        "activation=leaky",
-        "",
-        "[convolutional]",
-        "batch_normalize=1",
-        "filters=256",
-        "size=3",
-        "stride=1",
-        "pad=1",
-        "activation=leaky",
-        "",
-        "[shortcut]",
-        "from=-3",
-        "activation=linear",
-    ])
-
-    dn, k, network = make_networks(tmp_path, cfg_text)
-
-    net_input = rand_float32(network.input_shape())
-
-    print("net_input=", net_input, "shape:", net_input.shape)
-
-    dn_output = dn.predict(net_input)
-    print("dn_output=", dn_output, "shape:", dn_output.shape)
-
-    k_output = k.predict(np.expand_dims(net_input, axis=0)).squeeze(axis=0)
-    print("k_output=", k_output, "shape:", k_output.shape)
-
-    np.testing.assert_equal(k_output, dn_output)
+    compare_dn_to_keras(tmp_path, cfg_text, decimal=6)
 
 
 @pytest.mark.parametrize("size", [2, 10, 20])
@@ -495,6 +315,7 @@ def test_yolo(tmp_path, size, classes, mask):
     print("k_output=", k_output, "shape:", k_output.shape)
 
     np.testing.assert_almost_equal(k_output, dn_output, decimal=7)
+    assert not np.isnan(k_output).any()
 
 
 @pytest.mark.parametrize("use_dn_image", [True, False])
@@ -535,6 +356,7 @@ def test_predict_image(tmp_path, use_dn_image):
     k_output = k.predict(np.expand_dims(k_image, axis=0)).squeeze(axis=0)
 
     np.testing.assert_almost_equal(k_output, dn_output, decimal=5) # XXX why the high error?
+    assert not np.isnan(k_output).any()
 
 
 def darknet_compute(cfg_file, image_file):
