@@ -98,14 +98,16 @@ def boxes_from_array(boxes_array):
 
 
 def draw_boxes(im, boxes, names=None):
-    n_classes = len(boxes[0].classes) if len(boxes) > 0 else 0
+    if len(boxes) == 0: return
+
+    n_classes = len(boxes[0].classes)
     classes_found = list({i for i in range(n_classes) for b in boxes if b.classes[i] > 0})
     hue = {classes_found[i]: int(360*i/len(classes_found)) for i in range(len(classes_found))}
 
     if names == None:
         names = [f'c={i}' for i in range(n_classes)]
     else:
-        assert n_classes == len(names)
+        assert n_classes == len(names), f'{n_classes} != {len(names)}'
 
     # try to avoid really thin lines on big images and thick lines on little ones
     line_width = round(1+max(im.size[0], im.size[1])/500)
