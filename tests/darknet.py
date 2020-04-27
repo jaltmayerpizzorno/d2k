@@ -23,14 +23,6 @@ class _NET_OUTPUTS(ctypes.Structure):
     ]
 
 
-class _SHAPE(ctypes.Structure):
-    _fields_ = [
-        ('h', c_int),
-        ('w', c_int),
-        ('c', c_int)
-    ]
-
-
 class _DETECTION(ctypes.Structure):
     _fields_ = [
         ('x', c_float),
@@ -58,9 +50,6 @@ class darknet:
     """ctypes wrapper for original Darknet code"""
 
     helper_dll = ctypes.CDLL(HELPER_DLL, ctypes.RTLD_GLOBAL)
-
-    helper_dll.get_net_output_shape.argtypes = [c_void_p]
-    helper_dll.get_net_output_shape.restype = _SHAPE
 
     helper_dll.get_net_outputs.argtypes = [c_void_p]
     helper_dll.get_net_outputs.restype = _NET_OUTPUTS
@@ -98,10 +87,8 @@ class darknet:
         self.net = self.dll.load_network(str(config_file).encode(), str(weights_file).encode(), 1)
 
         self.dll.network_predict_image.argtypes = [c_void_p, _IMAGE]
-        self.dll.network_predict_image.restype = np.ctypeslib.ndpointer(dtype=c_float, shape=self.output_shape(), flags='C')
 
         self.dll.network_predict.argtypes = [c_void_p, np.ctypeslib.ndpointer(dtype=c_float, shape=self.input_shape(), flags='C')]
-        self.dll.network_predict.restype = np.ctypeslib.ndpointer(dtype=c_float, shape=self.output_shape(), flags='C')
 
     def __del__(self):
         if self.net != None:
@@ -118,11 +105,6 @@ class darknet:
         width = self.dll.network_width(self.net)
 
         return (self.input_size()//height//width, height, width)
-
-    def output_shape(self):
-        shape = darknet.helper_dll.get_net_output_shape(self.net)
-        return (shape.c, shape.h, shape.w)
-
 
     class image:
         dll = ctypes.CDLL(DARKNET_DLL, ctypes.RTLD_GLOBAL)

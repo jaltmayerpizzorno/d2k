@@ -1,21 +1,5 @@
 #include "../darknet/include/darknet.h"
 
-typedef struct {
-    int h, w, c;
-} shape;
-
-
-shape get_net_output_shape(network* net)
-{
-    layer output = get_network_output_layer(net);
-    shape s;
-    s.h = output.out_h;
-    s.w = output.out_w;
-    s.c = output.out_c;
-    return s;
-}
-
-
 int has_input(layer* l, int n) {
     for (int i=0; i<l->n; i++) {
         if (l->input_layers[i] == n) {
