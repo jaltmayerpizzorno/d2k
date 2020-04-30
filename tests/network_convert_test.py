@@ -1,7 +1,7 @@
 import pytest
 from d2k.network import Network, ConversionError
 
-yolov3_cfg = 'darknet/yolov3.cfg'
+yolov3_cfg = 'darknet-files/yolov3.cfg'
 
 
 def test_convert_no_layers():

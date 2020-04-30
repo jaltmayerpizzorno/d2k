@@ -1,6 +1,6 @@
 **/__pycache__
 **/.pytest_cache
-tests/cache/*
+!tests/cache/.gitignore
 *.tar.bz2
 **/*.swp
 helper.so

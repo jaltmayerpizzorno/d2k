@@ -3,7 +3,7 @@ import ctypes
 from ctypes import POINTER, c_void_p, c_int, c_char_p, c_float
 import tensorflow.keras as keras
 
-DARKNET_DLL = "../darknet/libdarknet.so"
+DARKNET_DLL = "./libdarknet.so"
 HELPER_DLL = "./helper.so"
 
 
@@ -23,7 +23,7 @@ class _NET_OUTPUTS(ctypes.Structure):
     ]
 
 
-class _DETECTION(ctypes.Structure):
+class _DETECTION_pjreddie(ctypes.Structure):
     _fields_ = [
         ('x', c_float),
         ('y', c_float),
@@ -34,6 +34,21 @@ class _DETECTION(ctypes.Structure):
         ('mask', POINTER(c_float)),
         ('objectness', c_float),
         ('sort_class', c_int)
+    ]
+
+class _DETECTION_alexeyab(ctypes.Structure):
+    _fields_ = [
+        ('x', c_float),
+        ('y', c_float),
+        ('w', c_float),
+        ('h', c_float),
+        ('classes', c_int),
+        ('prob', POINTER(c_float)),
+        ('mask', POINTER(c_float)),
+        ('objectness', c_float),
+        ('sort_class', c_int),
+        ('uc', POINTER(c_float)),
+        ('points', c_int)
     ]
 
 
@@ -49,26 +64,32 @@ class _IMAGE(ctypes.Structure):
 class darknet:
     """ctypes wrapper for original Darknet code"""
 
-    helper_dll = ctypes.CDLL(HELPER_DLL, ctypes.RTLD_GLOBAL)
-
-    helper_dll.get_net_outputs.argtypes = [c_void_p]
-    helper_dll.get_net_outputs.restype = _NET_OUTPUTS
-
-    helper_dll.free_net_outputs.argtypes = [_NET_OUTPUTS]
-
     def __init__(self, config_file, weights_file):
+        self.helper = ctypes.CDLL(HELPER_DLL, ctypes.RTLD_GLOBAL)
+
+        is_pjreddie = self.helper.d2k_is_pjreddie
+        is_pjreddie.argtypes = []
+        is_pjreddie.restype = c_int
+
+        self.helper.d2k_network_inputs.argtypes = [c_void_p]
+        self.helper.d2k_network_inputs.restype = c_int
+
+        self.helper.d2k_free_network.argtypes = [c_void_p]
+
+        detection_type = POINTER(_DETECTION_pjreddie) if is_pjreddie() else POINTER(_DETECTION_alexeyab)
+
+        self.helper.d2k_get_network_boxes.argtypes = [c_void_p, c_int, c_int, c_float, c_float, POINTER(c_int), c_int, POINTER(c_int)]
+        self.helper.d2k_get_network_boxes.restype = detection_type
+
+        self.helper.get_net_outputs.argtypes = [c_void_p]
+        self.helper.get_net_outputs.restype = _NET_OUTPUTS
+
+        self.helper.free_net_outputs.argtypes = [_NET_OUTPUTS]
+
         self.dll = ctypes.CDLL(DARKNET_DLL, ctypes.RTLD_GLOBAL)
 
         self.dll.load_network.argtypes = [c_char_p, c_char_p, c_int]
         self.dll.load_network.restype = c_void_p
-
-        self.dll.free_network.argtypes = [c_void_p]
-
-        self.dll.network_inputs.argtypes = [c_void_p]
-        self.dll.network_inputs.restype = c_int
-
-        self.dll.network_outputs.argtypes = [c_void_p]
-        self.dll.network_outputs.restype = c_int
 
         self.dll.network_height.argtypes = [c_void_p]
         self.dll.network_height.restype = c_int
@@ -76,29 +97,24 @@ class darknet:
         self.dll.network_width.argtypes = [c_void_p]
         self.dll.network_width.restype = c_int
 
-        self.dll.get_network_boxes.argtypes = [c_void_p, c_int, c_int, c_float, c_float, POINTER(c_int), c_int, POINTER(c_int)]
-        self.dll.get_network_boxes.restype = POINTER(_DETECTION)
+        self.dll.do_nms_sort.argtypes = [detection_type, c_int, c_int, c_float]
 
-        self.dll.do_nms_sort.argtypes = [POINTER(_DETECTION), c_int, c_int, c_float]
-
-        self.dll.free_detections.argtypes = [POINTER(_DETECTION), c_int]
+        self.dll.free_detections.argtypes = [detection_type, c_int]
 
         self.net = None     # in case loading fails... although, darknet tends to calls exit() in such cases
         self.net = self.dll.load_network(str(config_file).encode(), str(weights_file).encode(), 1)
 
-        self.dll.network_predict_image.argtypes = [c_void_p, _IMAGE]
+        self.helper.d2k_network_predict.argtypes = [c_void_p, np.ctypeslib.ndpointer(dtype=c_float, shape=self.input_shape(),
+                                                    flags='C')]
 
-        self.dll.network_predict.argtypes = [c_void_p, np.ctypeslib.ndpointer(dtype=c_float, shape=self.input_shape(), flags='C')]
+        self.dll.network_predict_image.argtypes = [c_void_p, _IMAGE]
 
     def __del__(self):
         if self.net != None:
-            self.dll.free_network(self.net)
+            self.helper.d2k_free_network(self.net)
 
     def input_size(self):
-        return self.dll.network_inputs(self.net)
-
-    def output_size(self):
-        return self.dll.network_outputs(self.net)
+        return self.helper.d2k_network_inputs(self.net)
 
     def input_shape(self):
         height = self.dll.network_height(self.net)
@@ -147,9 +163,9 @@ class darknet:
         else:
             assert keras.backend.image_data_format() == 'channels_last'
             net_input = np.ascontiguousarray(net_input.transpose([2,0,1])) # channels last to first
-            self.dll.network_predict(self.net, net_input)
+            self.helper.d2k_network_predict(self.net, net_input)
 
-        net_outputs = darknet.helper_dll.get_net_outputs(self.net)
+        net_outputs = self.helper.get_net_outputs(self.net)
 
         predictions = []
         for i in range(net_outputs.count):
@@ -157,15 +173,15 @@ class darknet:
             predictions.append(
                 np.ctypeslib.as_array(layer.output, shape=(layer.c, layer.h, layer.w)).copy().transpose([1,2,0]))
 
-        darknet.helper_dll.free_net_outputs(net_outputs)
+        self.helper.free_net_outputs(net_outputs)
 
         return predictions if len(predictions) != 1 else predictions[0]
 
 
     def get_network_boxes(self, image, thresh=.5, hier_thresh=.5, do_nms=False):
         num_boxes = c_int()
-        boxes = self.dll.get_network_boxes(self.net, image.image.w, image.image.h, thresh, hier_thresh,
-                                           None, 0, ctypes.byref(num_boxes))
+        boxes = self.helper.d2k_get_network_boxes(self.net, image.image.w, image.image.h, thresh, hier_thresh,
+                                                  None, 0, ctypes.byref(num_boxes))
 
         if do_nms and num_boxes.value > 0:
             self.dll.do_nms_sort(boxes, num_boxes, boxes[0].classes, thresh)

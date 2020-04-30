@@ -1,7 +1,7 @@
 import pytest
 import d2k.network
 
-yolov3_cfg = 'darknet/yolov3.cfg'
+yolov3_cfg = 'darknet-files/yolov3.cfg'
 
 
 def test_parse():

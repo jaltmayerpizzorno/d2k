@@ -32,8 +32,8 @@ python yolov3.py tests/data/dog.png
 
 In Python, using it is as simple as, for example,
 ```python
-network = d2k.network.load(Path('darknet/yolov3.cfg').read_text())
-model = network.make_model(Path('darknet/yolov3.weights').read_bytes())
+network = d2k.network.load(Path('darknet-files/yolov3.cfg').read_text())
+model = network.make_model(Path('darknet-files/yolov3.weights').read_bytes())
 image = d2k.image.load(image_file)
 boxes = d2k.network.detect_image(model, image)
 
@@ -81,10 +81,12 @@ included here for convenience.
 
 ## Other Darknet and YOLO
 
-Others came before me (and did great things).  Here are some of them:
+There are YOLOs aplenty.  Here are some I find particularly noteworthy:
 
 - [Darknet YOLO project](https://pjreddie.com/darknet/yolo/)
 - [Darknet on GitHub](https://github.com/pjreddie/darknet)
+- [YOLOv4 on GitHub](https://github.com/AlexeyAB/darknet)
 - [Allan Zellener's YAD2K for Yolo9000](https://github.com/allanzelener/YAD2K)
 - [Ultralytics' YOLOv3 in PyTorch](https://github.com/ultralytics/yolov3)
 - [Huynh Ngoc Anh's YOLOv3 in Keras](https://github.com/experiencor/keras-yolo3)
+- [Anton Muehlemann's (very cool) YOLOv3](http://github.com/antonmu/TrainYourOwnYOLO)

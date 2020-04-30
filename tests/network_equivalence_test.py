@@ -9,9 +9,9 @@ from pathlib import Path
 
 test_data_path = Path('tests/data')
 test_cache_path = Path('tests/cache')
-yolov3_cfg = Path('darknet/yolov3.cfg')
-yolov3_weights = Path('darknet/yolov3.weights')
-coco_names = Path('darknet/coco.names')
+yolov3_cfg = Path('darknet-files/yolov3.cfg')
+yolov3_weights = Path('darknet-files/yolov3.weights')
+coco_names = Path('darknet-files/coco.names')
 
 
 def setup_function():
@@ -390,23 +390,7 @@ def darknet_compute(cfg_file, image_file):
     return dn_image.to_array(), output, boxes, nms_boxes
 
 
-def round_boxes(boxes):
-    # XXX is all this rounding hiding errors?
-    return np.concatenate([boxes[:,:4].round(decimals=2),   # x, y, w, h
-                           boxes[:,4:].round(decimals=5)],  # objectness, [classes]
-                          axis=1)
-
-
-def test_round_boxes():
-    a = np.array([[.123456, .234567, .345678, .456789, .567890, .678901, .789012],
-                  [.246802, .135791, .468024, .357913, .680246, .579135, .802468]])
-
-    np.testing.assert_equal(round_boxes(a),
-                            np.array([[.12, .23, .35, .46, .56789, .67890, .78901],
-                                      [.25, .14, .47, .36, .68025, .57913, .80247]]))
-
-
-@pytest.mark.parametrize("image_stem", ['zebra', 'dog'])
+@pytest.mark.parametrize("image_stem", ['zebra', 'dog', 'cats'])
 def test_boxes_from_darknet_output(image_stem):
     image, dn_output, dn_boxes, _ = darknet_compute(yolov3_cfg, test_data_path / (image_stem + '.png'))
 
@@ -418,12 +402,11 @@ def test_boxes_from_darknet_output(image_stem):
     dn_output = d2k.network.post_just_activate(dn_output, network.config)
     k_boxes = d2k.network.boxes_from_output(dn_output, net_dim, image_dim)
     k_boxes = np.array([b.to_list() for b in k_boxes], dtype=np.float32)
-    print('k_boxes:', k_boxes)
 
-    np.testing.assert_equal(round_boxes(k_boxes), round_boxes(dn_boxes))
+    np.testing.assert_almost_equal(k_boxes, dn_boxes, decimal=4) # XXX why the high error?
 
 
-@pytest.mark.parametrize("image_stem", ['zebra', 'dog'])
+@pytest.mark.parametrize("image_stem", ['zebra', 'dog', 'cats'])
 def test_nms_from_darknet_boxes(image_stem):
     _, _, dn_boxes, dn_nms = darknet_compute(yolov3_cfg, test_data_path / (image_stem + '.png'))
 
