@@ -1,7 +1,9 @@
 import pytest
 import d2k.network
+from pathlib import Path
 
-yolov3_cfg = 'darknet-files/yolov3.cfg'
+yolov3_cfg = Path('darknet-files/yolov3.cfg')
+yolov4_cfg = Path('darknet-files/yolov4.cfg')
 
 
 def test_parse():
@@ -186,6 +188,8 @@ def test_load_set_defaults():
         "",
         "[upsample]",
         "",
+        "[maxpool]",
+        "",
     ])
 
     network = d2k.network.load(cfg)
@@ -211,6 +215,68 @@ def test_load_set_defaults():
             "",
             "[upsample]",
             "stride=2",
+            "",
+            "[maxpool]",
+            "padding=0",
+            "size=1",
+            "stride=1",
+            "",
+    ])
+
+
+def test_load_maxpool_set_defaults():
+    cfg = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=200",
+        "channels=2",
+        "",
+        "[maxpool]",
+        "stride=3",
+        "",
+    ])
+
+    network = d2k.network.load(cfg)
+
+    assert cfg_to_string(network) == '\n'.join([
+            "[net]",
+            "channels=2",
+            "height=100",
+            "width=200",
+            "",
+            "[maxpool]",
+            "padding=2",
+            "size=3",
+            "stride=3",
+            "",
+    ])
+
+
+def test_load_maxpool_with_size_set_defaults():
+    cfg = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=200",
+        "channels=2",
+        "",
+        "[maxpool]",
+        "stride=3",
+        "size=2",
+        "",
+    ])
+
+    network = d2k.network.load(cfg)
+
+    assert cfg_to_string(network) == '\n'.join([
+            "[net]",
+            "channels=2",
+            "height=100",
+            "width=200",
+            "",
+            "[maxpool]",
+            "padding=1",
+            "size=2",
+            "stride=3",
             "",
     ])
 
@@ -542,5 +608,9 @@ def test_load_shortcut_out_of_range(layer):
 
 
 def test_load_yolov3_doesnt_throw():
-    with open(yolov3_cfg, 'r') as f:
-        d2k.network.load(f.read())
+    d2k.network.load(yolov3_cfg.read_text())
+
+
+@pytest.mark.skip() # XXX not ready for this yet
+def test_load_yolov4_doesnt_throw():
+    d2k.network.load(yolov4_cfg.read_text())

@@ -1,8 +1,12 @@
 import pytest
 from d2k.network import Network, ConversionError
+from pathlib import Path
 
-yolov3_cfg = 'darknet-files/yolov3.cfg'
+yolov3_cfg = Path('darknet-files/yolov3.cfg')
+yolov4_cfg = Path('darknet-files/yolov4.cfg')
 
+# assume YOLOv4 requirements supported if this file exists
+darknet_has_yolov4 = Path('darknet/cfg/yolov4.cfg').exists()
 
 def test_convert_no_layers():
     cfg = '\n'.join([
@@ -101,6 +105,32 @@ def test_convert_convolutional_activation():
     ]
 
 
+def test_convert_convolutional_activation_mish():
+    cfg = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=200",
+        "channels=3",
+        "",
+        "[convolutional]",
+        "filters=32",
+        "size=3",
+        "stride=2",
+        "pad=1",
+        "activation=mish",
+    ])
+
+    net = Network.load(cfg).convert()
+    assert net == [
+        "layer_in = keras.Input(shape=(100, 200, 3))",
+        "layer_0 = keras.layers.ZeroPadding2D(((1,1),(1,1)))(layer_in)",
+        "layer_0 = keras.layers.Conv2D(32, 3, strides=2, use_bias=True, name='conv_0')(layer_0)",
+        "layer_0 = layer_0 * K.tanh(K.switch(layer_0 > 20, layer_0, " +
+                                   "K.switch(layer_0 < -20, K.exp(layer_0), K.log(K.exp(layer_0)+1))))",
+        "layer_out = layer_0"
+    ]
+
+
 def test_convert_convolutional_batch_normalize():
     cfg = '\n'.join([
         "[net]",
@@ -137,6 +167,60 @@ def test_convert_convolutional_unsupported_option():
         "",
         "[convolutional]",
         "foo=bar",
+    ])
+
+    with pytest.raises(ConversionError):
+        Network.load(cfg).convert()
+
+
+def test_convert_maxpool():
+    cfg = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=200",
+        "channels=3",
+        "",
+        "[maxpool]",
+    ])
+
+    net = Network.load(cfg).convert()
+    assert net == [
+        "layer_in = keras.Input(shape=(100, 200, 3))",
+        "layer_0 = keras.layers.MaxPool2D(pool_size=1, strides=1)(layer_in)",
+        "layer_out = layer_0"
+    ]
+
+
+def test_convert_maxpool_with_padding():
+    cfg = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=200",
+        "channels=3",
+        "",
+        "[maxpool]",
+        "size=4",
+        "stride=5",
+    ])
+
+    net = Network.load(cfg).convert()
+    assert net == [
+        "layer_in = keras.Input(shape=(100, 200, 3))",
+        "layer_0 = tf.pad(layer_in, tf.constant([[0,0],[1,2],[1,2],[0,0]]), constant_values=-np.inf)",
+        "layer_0 = keras.layers.MaxPool2D(pool_size=4, strides=5)(layer_0)",
+        "layer_out = layer_0"
+    ]
+
+
+def test_convert_maxpool_unsupported_option():
+    cfg = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=200",
+        "channels=3",
+        "",
+        "[maxpool]",
+        "stride_x=10",
     ])
 
     with pytest.raises(ConversionError):
@@ -515,6 +599,15 @@ def test_convert_unsupported_section():
 
 def test_convert_yolov3_doesnt_throw():
     with open(yolov3_cfg, 'r') as f:
+        cfg = f.read()
+
+    Network.load(cfg).convert()
+
+
+@pytest.mark.skip() # XXX not ready for this yet
+@pytest.mark.skipif(not darknet_has_yolov4, reason='Darknet lacks support')
+def test_convert_yolov4_doesnt_throw():
+    with open(yolov4_cfg, 'r') as f:
         cfg = f.read()
 
     Network.load(cfg).convert()

@@ -4,4 +4,5 @@
 *.tar.bz2
 **/*.swp
 helper.so
+libdarknet.so
 yolov3.h5

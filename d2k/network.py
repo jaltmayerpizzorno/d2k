@@ -94,6 +94,9 @@ class Network:
             '[upsample]': {
                 'stride': 2
             },
+            '[maxpool]': {
+                'stride': 1
+            },
             '[yolo]': {
                 'classes': 20,
                 'num': 1,
@@ -124,6 +127,10 @@ class Network:
                     options['from'] += i
                 if options['from'] < 0 or options['from'] >= i:
                     raise ConfigurationError('[route] requests layer out of range')
+
+            elif section == '[maxpool]':
+                if not 'size' in options: options['size'] = options['stride']
+                if not 'padding' in options: options['padding'] = options['size']-1
 
             elif section == '[yolo]':
                 if 'mask' in options and not isinstance(options['mask'], list):
@@ -220,9 +227,16 @@ class Network:
                     if batch_normalize:
                         net.append(f'layer_{i} = keras.layers.BatchNormalization(epsilon=.00001, name=\'bn_{i}\')(layer_{i})')
 
-                    if activation != 'linear':
-                        if activation != 'leaky': raise ConversionError(f'Unsupported activation "{activation}"')
+                    if activation == 'leaky':
                         net.append(f'layer_{i} = keras.layers.LeakyReLU(alpha=.1)(layer_{i})')
+                    elif activation == 'mish':
+                        MISH_THRESH = 20
+                        net.append(f'layer_{i} = layer_{i} * K.tanh(K.switch(layer_{i} > {MISH_THRESH}, layer_{i}, ' +
+                                                                  f'K.switch(layer_{i} < -{MISH_THRESH}, K.exp(layer_{i}), ' +
+                                                                           f'K.log(K.exp(layer_{i})+1))))')
+                    elif activation != 'linear':
+                        raise ConversionError(f'Unsupported activation "{activation}"')
+
 
                 elif section == '[route]':
                     layers = list(options['layers'])
@@ -255,13 +269,29 @@ class Network:
 
                     net.append(f'layer_{i} = keras.layers.UpSampling2D({stride})({prev_layer})')
 
+                elif section == '[maxpool]':
+                    stride = options['stride']
+                    size = options['size']
+                    padding = options['padding']
+                    _checkSupported(options, {'stride', 'size', 'padding'})
+
+                    if padding > 0:
+                        # XXX is there an easy keras.backend equivalent of tf.pad?
+                        net.append(f'layer_{i} = tf.pad({prev_layer}, tf.constant([[0,0],[{padding//2},{padding-padding//2}],' +
+                                                                                 f'[{padding//2},{padding-padding//2}],[0,0]]), ' +
+                                                                                                      f'constant_values=-np.inf)')
+                        prev_layer = f'layer_{i}'
+
+                    net.append(f'layer_{i} = keras.layers.MaxPool2D(pool_size={size}, strides={stride})({prev_layer})')
+
                 elif section == '[yolo]':
                     classes = options['classes']
                     anchors = options['anchors']
                     mask = options['mask']
                     _checkSupported(options, {'classes', 'mask', 'anchors',
                                               # those below are ignored (so far)
-                                               'num', 'jitter', 'ignore_thresh', 'truth_thresh', 'random'})
+                                               'num', 'jitter', 'ignore_thresh', 'truth_thresh', 'random',
+                                               'iou_loss', 'cls_normalizer', 'iou_normalizer', 'iou_thresh'}) # training only
 
                     j_a = ', just_activate=True' if just_activate_yolo else ''
 
@@ -355,7 +385,7 @@ class Network:
 
                 conv.set_weights(weights)
             else:
-                assert section in ['[route]', '[shortcut]', '[upsample]', '[yolo]'] # none of these have weights
+                assert section in ['[route]', '[shortcut]', '[upsample]', '[maxpool]', '[yolo]'] # none of these have weights
 
         assert r.at_eof()
 
@@ -370,7 +400,11 @@ class Network:
            just_activate_yolo -- has Yolo layers only perform activation, like in (non-training) Darknet,
                                  to facilitate comparison (default: False)
         """
+
         g = globals().copy()
+        exec('import tensorflow as tf', g, g)
+        exec('import tensorflow.keras.backend as K', g, g)
+        print('\n'.join(self.convert(just_activate_yolo=just_activate_yolo)))
         exec('\n'.join(self.convert(just_activate_yolo=just_activate_yolo)), g, g)
         model = keras.Model(g['layer_in'], g['layer_out'])
         if weights != None: self._read_weights(model, weights)

@@ -9,9 +9,10 @@ from pathlib import Path
 
 test_data_path = Path('tests/data')
 test_cache_path = Path('tests/cache')
-yolov3_cfg = Path('darknet-files/yolov3.cfg')
-yolov3_weights = Path('darknet-files/yolov3.weights')
-coco_names = Path('darknet-files/coco.names')
+darknet_files = Path('darknet-files')
+
+# assume YOLOv4 requirements supported if this file exists
+darknet_has_yolov4 = Path('darknet/cfg/yolov4.cfg').exists()
 
 
 def setup_function():
@@ -69,7 +70,7 @@ class DummyWeightsWriter:
 
             else:
                 # none of these have weights or change number of filters
-                assert section in ['[shortcut]', '[upsample]', '[yolo]']
+                assert section in ['[shortcut]', '[upsample]', '[maxpool]', '[yolo]']
 
             out_dim[i] = in_dim
 
@@ -176,6 +177,29 @@ def test_convolutional(tmp_path, size, stride, pad, activation, bn):
     compare_dn_to_keras(tmp_path, cfg_text, decimal=6)
 
 
+@pytest.mark.parametrize("size, stride", [(1,1),(2,1),(2,2),(3,1),(3,2)])
+@pytest.mark.parametrize("pad", [0,1])
+@pytest.mark.parametrize("bn", [0,1])
+@pytest.mark.skipif(not darknet_has_yolov4, reason='mish unsupported otherwise')
+def test_convolutional_mish(tmp_path, size, stride, pad, bn):
+    cfg_text = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=150",
+        "channels=3",
+        "",
+        "[convolutional]",
+        f"batch_normalize={bn}",
+        "filters=2",
+        f"size={size}",
+        f"stride={stride}",
+        f"pad={pad}",
+        f"activation=mish",
+    ])
+
+    compare_dn_to_keras(tmp_path, cfg_text, decimal=5) # XXX why the high error?
+
+
 # size=1 stride>1 not supported by darknet
 @pytest.mark.parametrize("stride", [1, 2, 3])
 def test_upsample(tmp_path, stride):
@@ -187,6 +211,25 @@ def test_upsample(tmp_path, stride):
         "",
         "[upsample]",
         f"stride={stride}",
+    ])
+
+    compare_dn_to_keras(tmp_path, cfg_text)
+
+
+@pytest.mark.parametrize("stride", [1, 2, 3, 5, 7])
+@pytest.mark.parametrize("size", [2, 3, 4, 5, 7])
+@pytest.mark.parametrize("padding", [None, 0, 2, 3])
+def test_maxpool(tmp_path, stride, size, padding):
+    cfg_text = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=150",
+        "channels=3",
+        "",
+        "[maxpool]",
+        f"stride={stride}",
+        f"size={size}",
+        f"{f'padding={padding}' if padding != None else ''}"
     ])
 
     compare_dn_to_keras(tmp_path, cfg_text)
@@ -361,9 +404,9 @@ def test_predict_image(tmp_path, use_dn_image):
 
 def darknet_compute(cfg_file, image_file):
     # a little caching goes a long way when running this again and again...
-    output_file    = test_cache_path / (image_file.stem + '-output.npz')
-    boxes_file     = test_cache_path / (image_file.stem + '-boxes.npz')
-    nms_boxes_file = test_cache_path / (image_file.stem + '-nms-boxes.npz')
+    output_file    = test_cache_path / (image_file.stem + '-' + cfg_file + '-output.npz')
+    boxes_file     = test_cache_path / (image_file.stem + '-' + cfg_file + '-boxes.npz')
+    nms_boxes_file = test_cache_path / (image_file.stem + '-' + cfg_file + '-nms-boxes.npz')
 
     dn_image = darknet.image.load(image_file)
 
@@ -377,7 +420,8 @@ def darknet_compute(cfg_file, image_file):
         nms_boxes = np.load(nms_boxes_file, allow_pickle=True)
         nms_boxes = nms_boxes[nms_boxes.files[0]]
     except IOError:
-        dn = darknet(cfg_file, cfg_file.parent / (cfg_file.stem + '.weights'))
+        dn = darknet(darknet_files / (cfg_file + '.cfg'),
+                     darknet_files / (cfg_file + '.weights'))
 
         output = dn.predict(dn_image)
         boxes = dn.get_network_boxes(dn_image, do_nms=False)
@@ -391,10 +435,10 @@ def darknet_compute(cfg_file, image_file):
 
 
 @pytest.mark.parametrize("image_stem", ['zebra', 'dog', 'cats'])
-def test_boxes_from_darknet_output(image_stem):
-    image, dn_output, dn_boxes, _ = darknet_compute(yolov3_cfg, test_data_path / (image_stem + '.png'))
+def test_boxes_from_darknet_output_yolov3(image_stem):
+    image, dn_output, dn_boxes, _ = darknet_compute('yolov3', test_data_path / (image_stem + '.png'))
 
-    network = d2k.network.load(yolov3_cfg.read_text())
+    network = d2k.network.load((darknet_files / 'yolov3.cfg').read_text())
 
     image_dim = (image.shape[1], image.shape[0])
     net_dim = (network.input_shape()[1], network.input_shape()[0])
@@ -408,7 +452,7 @@ def test_boxes_from_darknet_output(image_stem):
 
 @pytest.mark.parametrize("image_stem", ['zebra', 'dog', 'cats'])
 def test_nms_from_darknet_boxes(image_stem):
-    _, _, dn_boxes, dn_nms = darknet_compute(yolov3_cfg, test_data_path / (image_stem + '.png'))
+    _, _, dn_boxes, dn_nms = darknet_compute('yolov3', test_data_path / (image_stem + '.png'))
 
     dn_boxes = d2k.box.boxes_from_array(dn_boxes)
     dn_nms = d2k.box.boxes_from_array(dn_nms)
@@ -439,9 +483,9 @@ def test_nms_from_darknet_boxes(image_stem):
 def test_yolov3(image, dn_result, use_detect_image):
     image_file = test_data_path / (image + '.png')
 
-    network = d2k.network.load(yolov3_cfg.read_text())
-    k = network.make_model(yolov3_weights.read_bytes())
-    names = coco_names.read_text().splitlines()
+    network = d2k.network.load((darknet_files / 'yolov3.cfg').read_text())
+    k = network.make_model((darknet_files / 'yolov3.weights').read_bytes())
+    names = (darknet_files / 'coco.names').read_text().splitlines()
 
     image = d2k.image.load(image_file)
 
