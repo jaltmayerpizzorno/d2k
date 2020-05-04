@@ -348,16 +348,47 @@ def test_yolo(tmp_path, size, classes, mask):
 
     net_input = rand_float32(network.input_shape())
 
-    print("net_input=", net_input, "shape:", net_input.shape)
+    dn_output = dn.predict(net_input)
+    dn_output = dn_output.reshape(height, width, len(mask), (4+1+classes))
+
+    k_output = k.predict(np.expand_dims(net_input, axis=0)).squeeze(axis=0)
+
+    np.testing.assert_almost_equal(k_output, dn_output, decimal=7)
+    assert not np.isnan(k_output).any()
+
+
+@pytest.mark.skipif(not darknet_has_yolov4, reason='scale_x_y unsupported otherwise')
+@pytest.mark.parametrize("size", [2, 10, 20])
+@pytest.mark.parametrize("classes", [3, 20])
+@pytest.mark.parametrize("mask", [range(0,3), range(2,7), range(0,9)])
+@pytest.mark.parametrize("scale_x_y", [.9, 1.05, 1.1, 1.2])
+def test_yolo_scale_x_y(tmp_path, size, classes, mask, scale_x_y):
+    height = size 
+    width = size
+    cfg_text = '\n'.join([
+        "[net]",
+        f"height={height}",
+        f"width={width}",
+        f"channels={(4+1+classes)*len(mask)}",
+        "",
+        "[yolo]",
+        f"classes={classes}",
+        "num=9",
+        f"mask={','.join([str(x) for x in mask])}",
+        "anchors = 10,13,  16,30,  33,23,  30,61,  62,45,  59,119,  116,90,  156,198,  373,326",
+        f"scale_x_y={scale_x_y}"
+    ])
+
+    dn, k, network = make_networks(tmp_path, cfg_text)
+
+    net_input = rand_float32(network.input_shape())
 
     dn_output = dn.predict(net_input)
     dn_output = dn_output.reshape(height, width, len(mask), (4+1+classes))
-    print("dn_output=", dn_output, "shape:", dn_output.shape)
 
     k_output = k.predict(np.expand_dims(net_input, axis=0)).squeeze(axis=0)
-    print("k_output=", k_output, "shape:", k_output.shape)
 
-    np.testing.assert_almost_equal(k_output, dn_output, decimal=7)
+    np.testing.assert_almost_equal(k_output, dn_output, decimal=6)
     assert not np.isnan(k_output).any()
 
 

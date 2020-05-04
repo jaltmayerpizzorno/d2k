@@ -99,6 +99,7 @@ class Network:
             '[yolo]': {
                 'classes': 20,
                 'num': 1,
+                'scale_x_y': 1.0
             }
         }
 
@@ -287,16 +288,21 @@ class Network:
                     classes = options['classes']
                     mask = options['mask']
                     anchors = [options['anchors'][m] for m in mask]
-                    _checkSupported(options, {'num', 'classes', 'mask', 'anchors',
+                    scale_x_y = options['scale_x_y']
+                    _checkSupported(options, {'num', 'classes', 'mask', 'anchors', 'scale_x_y',
                                               # those below are ignored (so far)
-                                              'jitter', 'ignore_thresh', 'truth_thresh', 'random',
-                                              'iou_loss', 'cls_normalizer', 'iou_normalizer', 'iou_thresh'}) # training only
+                                               'jitter', 'ignore_thresh', 'truth_thresh', 'random',
+                                               'iou_loss', 'cls_normalizer', 'iou_normalizer', 'iou_thresh'}) # training only
 
                     L = f'layer_{i}'
 
                     net.append(f'{L} = K.reshape({prev_layer}, (-1, *K.int_shape({prev_layer})[1:3], {len(anchors)}, {4+1+classes}))')
 
-                    net.append(f'{L}_xy = keras.activations.sigmoid({L}[...,0:2])')
+                    if scale_x_y != 1.0:
+                        net.append(f'{L}_scale_x_y = K.constant({scale_x_y}, dtype="float32")')
+
+                    net.append(f'{L}_xy = keras.activations.sigmoid({L}[...,0:2])' +
+                               (f' * {L}_scale_x_y - .5*({L}_scale_x_y - 1)' if scale_x_y != 1.0 else ''))
                     net.append(f'{L}_wh = {L}[...,2:4]')
                     net.append(f'{L}_obj_classes = keras.activations.sigmoid({L}[...,4:])')
                     net.append(f'{L} = K.concatenate(({L}_xy, {L}_wh, {L}_obj_classes))')

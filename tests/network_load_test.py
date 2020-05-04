@@ -306,6 +306,7 @@ def test_load_yolo_anchors_and_defaults():
             "classes=20",
             "mask=[0, 1]",
             "num=1",    # XXX actually invalid (num must be >=2*len(anchors))
+            "scale_x_y=1.0",
             ""
     ])
 
@@ -355,6 +356,7 @@ def test_set_defaults_yolo_no_mask(num):
             "classes=20",
             f"mask={list(range(num_value))}",
             f"num={num_value}",
+            "scale_x_y=1.0",
             "",
     ])
 
@@ -385,6 +387,7 @@ def test_set_defaults_yolo_mask(spec, value):
             "classes=20",
             f"mask={value}",
             "num=1",
+            "scale_x_y=1.0",
             "",
     ])
 
@@ -448,6 +451,7 @@ def test_set_defaults_doesnt_override():
             "classes=10",
             "mask=[1, 2]",
             "num=3",
+            "scale_x_y=1.0",
             "",
     ])
 

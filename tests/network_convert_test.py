@@ -620,6 +620,33 @@ def test_convert_just_activate_yolo():
     ]
 
 
+def test_convert_yolo_scale_x_y():
+    cfg = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=200",
+        "channels=3",
+        "",
+        "[yolo]",
+        "classes=10",
+        "mask=0,1",
+        "anchors=10,10, 20,20",
+        "scale_x_y=1.1",
+    ])
+
+    net = Network.load(cfg).convert(just_activate_yolo=True)
+    assert net == [
+        "layer_in = keras.Input(shape=(100, 200, 3))",
+        "layer_0 = K.reshape(layer_in, (-1, *K.int_shape(layer_in)[1:3], 2, 15))",
+        'layer_0_scale_x_y = K.constant(1.1, dtype="float32")',
+        'layer_0_xy = keras.activations.sigmoid(layer_0[...,0:2]) * layer_0_scale_x_y - .5*(layer_0_scale_x_y - 1)',
+        'layer_0_wh = layer_0[...,2:4]',
+        'layer_0_obj_classes = keras.activations.sigmoid(layer_0[...,4:])',
+        'layer_0 = K.concatenate((layer_0_xy, layer_0_wh, layer_0_obj_classes))',
+        "layer_out = layer_0",
+    ]
+
+
 def test_convert_yolo_unsupported_option():
     cfg = '\n'.join([
         "[net]",
