@@ -16,7 +16,7 @@ image_file = sys.argv[1]
 saved_model = Path('yolov3.h5')
 
 if (saved_model.exists()):
-    model = keras.models.load_model(saved_model, custom_objects={'Yolo': d2k.layers.Yolo})
+    model = keras.models.load_model(saved_model)
 else:
     network = d2k.network.load(Path('darknet-files/yolov3.cfg').read_text())
     model = network.make_model(Path('darknet-files/yolov3.weights').read_bytes())

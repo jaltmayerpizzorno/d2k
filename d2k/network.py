@@ -1,7 +1,6 @@
-import tensorflow.keras as keras
+import tensorflow as tf
 import numpy as np
 import struct
-import d2k.layers
 import d2k.box
 
 
@@ -194,9 +193,9 @@ class Network:
 
         net_options = self.config[0][1]
 
-        assert keras.backend.image_data_format() == 'channels_last'
+        assert tf.keras.backend.image_data_format() == 'channels_last'
 
-        net = [f"layer_in = keras.Input(shape=({net_options['height']}, {net_options['width']}, {net_options['channels']}))"]
+        net = [f'layer_in = keras.Input(shape=({net_options["height"]}, {net_options["width"]}, {net_options["channels"]}))']
         prev_layer = 'layer_in'
         layer_out = []
 
@@ -286,19 +285,39 @@ class Network:
 
                 elif section == '[yolo]':
                     classes = options['classes']
-                    anchors = options['anchors']
                     mask = options['mask']
-                    _checkSupported(options, {'classes', 'mask', 'anchors',
+                    anchors = [options['anchors'][m] for m in mask]
+                    _checkSupported(options, {'num', 'classes', 'mask', 'anchors',
                                               # those below are ignored (so far)
-                                               'num', 'jitter', 'ignore_thresh', 'truth_thresh', 'random',
-                                               'iou_loss', 'cls_normalizer', 'iou_normalizer', 'iou_thresh'}) # training only
+                                              'jitter', 'ignore_thresh', 'truth_thresh', 'random',
+                                              'iou_loss', 'cls_normalizer', 'iou_normalizer', 'iou_thresh'}) # training only
 
-                    j_a = ', just_activate=True' if just_activate_yolo else ''
+                    L = f'layer_{i}'
 
-                    net.append(f'layer_{i} = d2k.layers.Yolo(classes={classes}, ' +
-                                                           f'anchors={[anchors[m] for m in mask]}, ' +
-                                                           f'net_dims=({net_options["height"]}, {net_options["width"]})' +
-                                                           f'{j_a})({prev_layer})')
+                    net.append(f'{L} = K.reshape({prev_layer}, (-1, *K.int_shape({prev_layer})[1:3], {len(anchors)}, {4+1+classes}))')
+
+                    net.append(f'{L}_xy = keras.activations.sigmoid({L}[...,0:2])')
+                    net.append(f'{L}_wh = {L}[...,2:4]')
+                    net.append(f'{L}_obj_classes = keras.activations.sigmoid({L}[...,4:])')
+                    net.append(f'{L} = K.concatenate(({L}_xy, {L}_wh, {L}_obj_classes))')
+
+                    if not just_activate_yolo:
+                        net.append(f'{L}_l_w, {L}_l_h = K.int_shape({L})[1:3]')
+                        net.append(f'{L}_range_w = K.reshape(K.arange(0, {L}_l_w, dtype="float32"), (1, 1, {L}_l_w, 1, 1))')
+                        net.append(f'{L}_range_h = K.reshape(K.arange(0, {L}_l_h, dtype="float32"), (1, {L}_l_h, 1, 1, 1))')
+
+                        net.append(f'{L}_anchors_w = K.constant({[a[0] for a in anchors]}, dtype="float32", ' +
+                                                                                         f'shape=(1,1,1,{len(anchors)},1))')
+                        net.append(f'{L}_anchors_h = K.constant({[a[1] for a in anchors]}, dtype="float32", ' +
+                                                                                         f'shape=(1,1,1,{len(anchors)},1))')
+
+                        net.append(f'{L}_x = ({L}[...,0:1] + {L}_range_w) / {L}_l_w')
+                        net.append(f'{L}_y = ({L}[...,1:2] + {L}_range_h) / {L}_l_h')
+                        net.append(f'{L}_w = (K.exp({L}[...,2:3]) * {L}_anchors_w) / {net_options["width"]}')
+                        net.append(f'{L}_h = (K.exp({L}[...,3:4]) * {L}_anchors_h) / {net_options["height"]}')
+                        net.append(f'{L}_objectness = {L}[...,4:5]')
+                        net.append(f'{L}_classes = {L}[...,5:] * {L}_objectness')
+                        net.append(f'{L} = K.concatenate(({L}_x, {L}_y, {L}_w, {L}_h, {L}_objectness, {L}_classes))')
 
                 else:
                     raise ConversionError(f'Unsupported section {section}')
@@ -338,7 +357,7 @@ class Network:
                 return len(self.buffer) == self.offset
 
 
-        assert keras.backend.backend() == 'tensorflow' # weight orders are TF-specific
+        assert tf.keras.backend.backend() == 'tensorflow' # weight orders are TF-specific
 
         r = BinaryReader(weights)
 
@@ -401,12 +420,14 @@ class Network:
                                  to facilitate comparison (default: False)
         """
 
+        import tensorflow.keras as keras
+
         g = globals().copy()
-        exec('import tensorflow as tf', g, g)
-        exec('import tensorflow.keras.backend as K', g, g)
-        print('\n'.join(self.convert(just_activate_yolo=just_activate_yolo)))
-        exec('\n'.join(self.convert(just_activate_yolo=just_activate_yolo)), g, g)
-        model = keras.Model(g['layer_in'], g['layer_out'])
+        l = locals().copy()
+        exec('import tensorflow.keras.backend as K', g, l)
+#        print('\n'.join(self.convert(just_activate_yolo=just_activate_yolo)))
+        exec('\n'.join(self.convert(just_activate_yolo=just_activate_yolo)), g, l)
+        model = keras.Model(l['layer_in'], l['layer_out'])
         if weights != None: self._read_weights(model, weights)
         return model
 
