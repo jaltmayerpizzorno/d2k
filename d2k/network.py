@@ -113,7 +113,9 @@ class Network:
                     options['mask'] = list(range(options['num']))
 
         for (i, (section, options)) in enumerate(parsed[1:]):
-            if section == '[route]' and 'layers' in options:
+            if section == '[route]':
+                if not 'layers' in options: raise ConfigurationError('[route] must specify source layers')
+
                 layers = options['layers']
                 if not isinstance(layers, list):
                     layers = [layers]

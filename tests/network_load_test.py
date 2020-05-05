@@ -183,6 +183,7 @@ def test_load_set_defaults():
         "[convolutional]",
         "",
         "[route]",
+        "layers=0",
         "",
         "[shortcut]",
         "",
@@ -209,6 +210,7 @@ def test_load_set_defaults():
             "stride=1",
             "",
             "[route]",
+            "layers=[0]",
             "",
             "[shortcut]",
             "activation=linear",
@@ -407,8 +409,6 @@ def test_set_defaults_doesnt_override():
         "size=3",
         "stride=2",
         "",
-        "[route]",
-        "",
         "[shortcut]",
         "activation=leaky",
         "",
@@ -437,8 +437,6 @@ def test_set_defaults_doesnt_override():
             "pad=1",
             "size=3",
             "stride=2",
-            "",
-            "[route]",
             "",
             "[shortcut]",
             "activation=leaky",
@@ -514,7 +512,23 @@ def test_load_resolves_negative_route_layers(spec, result):
     ])
 
 
-@pytest.mark.parametrize("layer", [-2, 1, 2])
+def test_load_route_missing_layers():
+    cfg = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=200",
+        "channels=2",
+        "",
+        "[convolutional]",
+        "",
+        "[route]",
+    ])
+
+    with pytest.raises(d2k.network.ConfigurationError):
+        d2k.network.load(cfg)
+
+
+@pytest.mark.parametrize("layer", [-2, 1, 2])   # layers=1 is a self-reference
 def test_load_route_out_of_range(layer):
     cfg = '\n'.join([
         "[net]",
