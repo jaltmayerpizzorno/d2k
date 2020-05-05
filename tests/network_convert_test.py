@@ -304,6 +304,37 @@ def test_convert_route_layers_multiple():
     ]
 
 
+def test_convert_route_jumps_layers():
+    cfg = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=200",
+        "channels=3",
+        "",
+        "[convolutional]",
+        "activation=linear",
+        "",
+        "[convolutional]",
+        "activation=linear",
+        "",
+        "[route]",
+        "layers=-2",
+        "",
+        "[route]",
+        "layers=-2, -1"
+    ])
+
+    net = Network.load(cfg).convert()
+    assert net == [
+        "layer_in = keras.Input(shape=(100, 200, 3))",
+        "layer_0 = keras.layers.Conv2D(1, 1, strides=1, use_bias=True, name='conv_0')(layer_in)",
+        "layer_1 = keras.layers.Conv2D(1, 1, strides=1, use_bias=True, name='conv_1')(layer_0)",
+        "layer_2 = layer_0",
+        "layer_3 = keras.layers.Concatenate()([layer_1, layer_2])",
+        "layer_out = layer_3"
+    ]
+
+
 def test_convert_route_unsupported_option():
     cfg = '\n'.join([
         "[net]",

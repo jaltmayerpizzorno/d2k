@@ -124,6 +124,7 @@ def compare_dn_to_keras(tmp_path, cfg_text, decimal=8):
 
     print("k-dn:", [x - y for x, y in zip(k_output, dn_output)])
 
+    assert len(dn_output) == len(k_output)
     for dn_out, k_out in zip(dn_output, k_output):
         np.testing.assert_almost_equal(k_out, dn_out, decimal=decimal)
          # NaN results aren't useful for assessing precision between DarkNet and our Keras net
@@ -320,6 +321,29 @@ def test_route_multiple_layers(tmp_path):
         "",
         "[route]",
         "layers=-1,-2",
+    ])
+
+    compare_dn_to_keras(tmp_path, cfg_text, decimal=6)
+
+
+def test_route_jumps_layers(tmp_path):
+    cfg_text = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=200",
+        "channels=3",
+        "",
+        "[convolutional]",
+        "activation=linear",
+        "",
+        "[convolutional]",
+        "activation=linear",
+        "",
+        "[route]",
+        "layers=-2",
+        "",
+        "[route]",
+        "layers=-2, -1"
     ])
 
     compare_dn_to_keras(tmp_path, cfg_text, decimal=6)

@@ -54,16 +54,6 @@ void d2k_free_network(network* net) {
 
 // ---
 
-int has_input(layer* l, int n) {
-    for (int i=0; i<l->n; i++) {
-        if (l->input_layers[i] == n) {
-            return 1;
-        }
-    }
-
-    return 0;
-}
-
 typedef struct {
     int h, w, c;
     float* output;
@@ -76,40 +66,51 @@ typedef struct {
 } net_outputs;
 
 
+/**
+ * Collects the output of all all layers whose output isn't used by another layer
+ */
 net_outputs get_net_outputs(network* net) {
-    int indices[net->n];
-    int count = 0;
+    int isOutput[net->n];
+    memset(&isOutput, 0, sizeof(isOutput));
 
-    int i = net->n-1;
+    // last layer isn't consumed by anyone, so it's an output
+    isOutput[net->n-1] = 1;
 
-    for(; i >= 0; --i) {
-        // this is as in darknet's get_network_output_layer
-        if (net->layers[i].type != COST) {
-            indices[count++] = i;
-            break;
-        }
-    }
-
-    for(; i > 0; --i) {
+    for (int i=1; i<net->n; i++) {  // start at 1 because a layer 0 [route] isn't valid
         if (net->layers[i].type == ROUTE) {
-            // if previous layer isn't an input to the route, it's a network output (leaf on tree)
-            if (!has_input(&net->layers[i], i-1)) {
-                indices[count++] = i-1;
+            layer* l = &net->layers[i];
+
+            isOutput[i-1] = 1;  // unless it's an input below
+
+            for (int j=0; j<l->n; j++) {
+                isOutput[l->input_layers[j]] = 0;
             }
         }
     }
 
+    int count = 0;
+
+    for (int i=0; i<net->n; i++) {
+        if (isOutput[i]) {
+            ++count;
+        }
+    }
+
     net_outputs outputs;
-    outputs.count = count;
+    outputs.count = 0;
     outputs.output = calloc(count, sizeof(layer_output));
 
-    for (i=0; i<count; ++i) {
-        layer l = net->layers[indices[count-i-1]];
+    for (int i=0; i<net->n; i++) {
+        if (isOutput[i]) {
+            layer* l = &net->layers[i];
 
-        outputs.output[i].h = l.out_h;
-        outputs.output[i].w = l.out_w;
-        outputs.output[i].c = l.out_c;
-        outputs.output[i].output = l.output;
+            outputs.output[outputs.count].h = l->out_h;
+            outputs.output[outputs.count].w = l->out_w;
+            outputs.output[outputs.count].c = l->out_c;
+            outputs.output[outputs.count].output = l->output;
+
+            ++outputs.count;
+        }
     }
 
     return outputs;

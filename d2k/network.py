@@ -200,7 +200,7 @@ class Network:
 
         net = [f'layer_in = keras.Input(shape=({net_options["height"]}, {net_options["width"]}, {net_options["channels"]}))']
         prev_layer = 'layer_in'
-        layer_out = []
+        output_layers = set()
 
         for (i, (section, options)) in enumerate(self.config[1:]):
 
@@ -245,10 +245,11 @@ class Network:
 
                     _checkSupported(options, {'layers'})
 
-                    layers_names = [f'layer_{x}' for x in layers]
+                    assert i>0, "[route] in layer 0 can't refer to any layers, so this shouldn't be loadable"
+                    output_layers.add(i-1)
+                    output_layers.difference_update(set(layers))
 
-                    if not prev_layer in layers_names:
-                        layer_out.append(prev_layer)
+                    layers_names = [f'layer_{x}' for x in layers]
 
                     if len(layers_names) == 1:
                         net.append(f'layer_{i} = {layers_names[0]}')
@@ -336,6 +337,7 @@ class Network:
             prev_layer = f'layer_{i}'
 
         if prev_layer != 'layer_in':
+            layer_out = [f'layer_{x}' for x in sorted(output_layers)]
             layer_out.append(prev_layer)
             net.append('layer_out = ' + ('[' if len(layer_out)>1 else '')
                                       + ', '.join(layer_out) +
@@ -458,7 +460,7 @@ def post_just_activate(output, config):
 
     result = []
     for l_out, l in zip(output, yolo_config):
-        l_h, l_w = l_out.shape[0], l_out.shape[1]
+        l_h, l_w = l_out.shape[0:2]
         l_m = len(l['mask'])
         l_out = l_out.reshape((l_h, l_w, l_m, l['classes']+4+1))
 
