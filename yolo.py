@@ -16,7 +16,7 @@ if not (args.print or args.save or args.image_file != None):
     argparser.print_usage()
     quit()
 
-saved_model = Path(f'yolo{args.version}.v5')
+saved_model = Path(f'yolo{args.version}.h5')
 
 import d2k
 from PIL import Image
@@ -32,7 +32,7 @@ else:
         print('\n'.join(network.convert()), '\n')
 
     if (args.save):
-        model.save(saved_model)
+        model.save(str(saved_model))
 
 if args.image_file != None:
     image = d2k.image.load(args.image_file)
