@@ -157,7 +157,7 @@ def test_read_weights_not_0_2(tmp_path):
 # size=1 stride>1 not supported by darknet
 @pytest.mark.parametrize("size, stride", [(1,1),(2,1),(2,2),(3,1),(3,2)])
 @pytest.mark.parametrize("pad", [0,1])
-@pytest.mark.parametrize("activation", ['linear','leaky'])
+@pytest.mark.parametrize("activation", ['linear','leaky'] + (['mish'] if darknet_has_yolov4 else []))
 @pytest.mark.parametrize("bn", [0,1])
 def test_convolutional(tmp_path, size, stride, pad, activation, bn):
     cfg_text = '\n'.join([
@@ -175,30 +175,7 @@ def test_convolutional(tmp_path, size, stride, pad, activation, bn):
         f"activation={activation}",
     ])
 
-    compare_dn_to_keras(tmp_path, cfg_text, decimal=6)
-
-
-@pytest.mark.parametrize("size, stride", [(1,1),(2,1),(2,2),(3,1),(3,2)])
-@pytest.mark.parametrize("pad", [0,1])
-@pytest.mark.parametrize("bn", [0,1])
-@pytest.mark.skipif(not darknet_has_yolov4, reason='mish unsupported otherwise')
-def test_convolutional_mish(tmp_path, size, stride, pad, bn):
-    cfg_text = '\n'.join([
-        "[net]",
-        "height=100",
-        "width=150",
-        "channels=3",
-        "",
-        "[convolutional]",
-        f"batch_normalize={bn}",
-        "filters=2",
-        f"size={size}",
-        f"stride={stride}",
-        f"pad={pad}",
-        f"activation=mish",
-    ])
-
-    compare_dn_to_keras(tmp_path, cfg_text, decimal=5) # XXX why the high error?
+    compare_dn_to_keras(tmp_path, cfg_text, decimal=6 if activation != 'mish' else 5)
 
 
 # size=1 stride>1 not supported by darknet
@@ -352,7 +329,8 @@ def test_route_jumps_layers(tmp_path):
 @pytest.mark.parametrize("size", [2, 10, 20])
 @pytest.mark.parametrize("classes", [3, 20])
 @pytest.mark.parametrize("mask", [range(0,3), range(2,7), range(0,9)])
-def test_yolo(tmp_path, size, classes, mask):
+@pytest.mark.parametrize("scale_x_y", [None] + ([.9, 1.05, 1.1, 1.2] if darknet_has_yolov4 else []))
+def test_yolo(tmp_path, size, classes, mask, scale_x_y):
     height = size 
     width = size
     cfg_text = '\n'.join([
@@ -366,6 +344,7 @@ def test_yolo(tmp_path, size, classes, mask):
         "num=9",
         f"mask={','.join([str(x) for x in mask])}",
         "anchors = 10,13,  16,30,  33,23,  30,61,  62,45,  59,119,  116,90,  156,198,  373,326",
+        f"{f'scale_x_y={scale_x_y}' if scale_x_y != None else ''}",
     ])
 
     dn, k, network = make_networks(tmp_path, cfg_text)
@@ -377,42 +356,7 @@ def test_yolo(tmp_path, size, classes, mask):
 
     k_output = k.predict(np.expand_dims(net_input, axis=0)).squeeze(axis=0)
 
-    np.testing.assert_almost_equal(k_output, dn_output, decimal=7)
-    assert not np.isnan(k_output).any()
-
-
-@pytest.mark.skipif(not darknet_has_yolov4, reason='scale_x_y unsupported otherwise')
-@pytest.mark.parametrize("size", [2, 10, 20])
-@pytest.mark.parametrize("classes", [3, 20])
-@pytest.mark.parametrize("mask", [range(0,3), range(2,7), range(0,9)])
-@pytest.mark.parametrize("scale_x_y", [.9, 1.05, 1.1, 1.2])
-def test_yolo_scale_x_y(tmp_path, size, classes, mask, scale_x_y):
-    height = size 
-    width = size
-    cfg_text = '\n'.join([
-        "[net]",
-        f"height={height}",
-        f"width={width}",
-        f"channels={(4+1+classes)*len(mask)}",
-        "",
-        "[yolo]",
-        f"classes={classes}",
-        "num=9",
-        f"mask={','.join([str(x) for x in mask])}",
-        "anchors = 10,13,  16,30,  33,23,  30,61,  62,45,  59,119,  116,90,  156,198,  373,326",
-        f"scale_x_y={scale_x_y}"
-    ])
-
-    dn, k, network = make_networks(tmp_path, cfg_text)
-
-    net_input = rand_float32(network.input_shape())
-
-    dn_output = dn.predict(net_input)
-    dn_output = dn_output.reshape(height, width, len(mask), (4+1+classes))
-
-    k_output = k.predict(np.expand_dims(net_input, axis=0)).squeeze(axis=0)
-
-    np.testing.assert_almost_equal(k_output, dn_output, decimal=6)
+    np.testing.assert_almost_equal(k_output, dn_output, decimal=7 if scale_x_y == None else 6)
     assert not np.isnan(k_output).any()
 
 
