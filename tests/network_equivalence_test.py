@@ -431,10 +431,11 @@ def darknet_compute(cfg_file, image_file):
 
 
 @pytest.mark.parametrize("image_stem", ['zebra', 'dog', 'cats'])
-def test_boxes_from_darknet_output_yolov3(image_stem):
-    image, dn_output, dn_boxes, _ = darknet_compute('yolov3', test_data_path / (image_stem + '.png'))
+@pytest.mark.parametrize("yolo", ['yolov3'] + (['yolov4'] if darknet_has_yolov4 else []))
+def test_boxes_from_darknet_output(image_stem, yolo):
+    image, dn_output, dn_boxes, _ = darknet_compute(yolo, test_data_path / (image_stem + '.png'))
 
-    network = d2k.network.load((darknet_files / 'yolov3.cfg').read_text())
+    network = d2k.network.load((darknet_files / (yolo + '.cfg')).read_text())
 
     image_dim = (image.shape[1], image.shape[0])
     net_dim = (network.input_shape()[1], network.input_shape()[0])
@@ -461,27 +462,40 @@ def test_nms_from_darknet_boxes(image_stem):
     assert sorted(k_nms) == sorted(dn_nms)
 
 
-# corners obtained from './darknet detect cfg/yolov3.cfg yolov3.weights filename'
-# (after adding code to print them)
-@pytest.mark.parametrize("image, dn_result", [['zebra', [(['zebra'],(335,104,557,268)),
-                                                         (['zebra'],(169,92,394,252)),
-                                                         (['zebra'],(48,90,234,267))]],
-                                              ['dog',   [(['bicycle'],(99,122,590,447)),
-                                                         (['truck'], (476,81,684,168)),
-                                                         (['dog'], (134,213,313,543))]],
-                                              # other than 'zebra' and 'dog', 'cats' is higher
-                                              # than it is wide -- needed for letterbox / box correction coverage
-                                              ['cats',  [(['cat'], (265,35,474,366)),
-                                                         (['cat'], (127,454,376,570))]]
-                         ])
-@pytest.mark.parametrize("use_detect_image", [False, True])
-#@pytest.mark.skip()
-def test_yolov3(image, dn_result, use_detect_image):
-    image_file = test_data_path / (image + '.png')
+@pytest.mark.parametrize("image_stem", ['zebra', 'dog', 'cats'])
+@pytest.mark.parametrize("yolo", ['yolov3'] + (['yolov4'] if darknet_has_yolov4 else []))
+def test_yolo_network(image_stem, yolo):
+    image_file = test_data_path / (image_stem + '.png')
+    _, dn_output, _, _ = darknet_compute(yolo, image_file)
 
-    network = d2k.network.load((darknet_files / 'yolov3.cfg').read_text())
-    k = network.make_model((darknet_files / 'yolov3.weights').read_bytes())
-    names = (darknet_files / 'coco.names').read_text().splitlines()
+    network = d2k.network.load((darknet_files / (yolo + '.cfg')).read_text())
+    k = network.make_model((darknet_files / (yolo + '.weights')).read_bytes(), just_activate_yolo=True)
+
+    net_h, net_w, _ = network.input_shape()
+
+    image = d2k.image.load(image_file)
+    image = d2k.image.letterbox(image, net_w, net_h)
+
+    k_output = k.predict(np.expand_dims(image, axis=0))
+    k_output = [x.squeeze(axis=0) for x in k_output]
+
+    assert len(dn_output) == len(k_output)
+    for dn_out, k_out in zip(dn_output, k_output):
+        print(k_out.shape)
+        dn_out = dn_out.reshape(k_out.shape)
+        np.testing.assert_almost_equal(k_out, dn_out, decimal=4) # XXX why the high error?
+        assert not np.isnan(k_out).any()    # NaN results aren't useful for comparing
+
+
+@pytest.mark.parametrize("image_stem", ['zebra', 'dog', 'cats'])
+@pytest.mark.parametrize("yolo", ['yolov3'] + (['yolov4'] if darknet_has_yolov4 else []))
+@pytest.mark.parametrize("use_detect_image", [False, True])
+def test_end_to_end(image_stem, yolo, use_detect_image):
+    image_file = test_data_path / (image_stem + '.png')
+    _, _, _, dn_boxes = darknet_compute(yolo, image_file)
+
+    network = d2k.network.load((darknet_files / (yolo + '.cfg')).read_text())
+    k = network.make_model((darknet_files / (yolo + '.weights')).read_bytes())
 
     image = d2k.image.load(image_file)
 
@@ -499,6 +513,10 @@ def test_yolov3(image, dn_result, use_detect_image):
         k_boxes = d2k.network.boxes_from_output(k_output, (net_w, net_h), image_dim)
         k_boxes = d2k.box.nms_boxes(k_boxes)
 
-    k_result = [([names[i]], b.corners()) for b in k_boxes for i in range(len(names)) if b.classes[i] > 0]
+    k_boxes = np.array([b.to_list() for b in k_boxes], dtype=np.float32)
+    k_boxes = k_boxes[np.lexsort((k_boxes[:,3], k_boxes[:,2], k_boxes[:,1], k_boxes[:,0]))]
 
-    assert sorted(dn_result) == sorted(k_result)
+    dn_boxes = dn_boxes[np.sum(dn_boxes[...,5:], axis=1) > 0]
+    dn_boxes = dn_boxes[np.lexsort((dn_boxes[:,3], dn_boxes[:,2], dn_boxes[:,1], dn_boxes[:,0]))]
+
+    np.testing.assert_almost_equal(k_boxes, dn_boxes, decimal=3) # XXX why the high error?

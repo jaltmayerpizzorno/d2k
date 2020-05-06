@@ -42,13 +42,30 @@ float* d2k_network_predict_image(network *net, image im) {
 }
 
 
-detection* d2k_get_network_boxes(network *net, int w, int h, float thresh, float hier, int *map, int relative, int *num) {
+detection* d2k_get_network_boxes(network *net, int w, int h, float thresh, float hier, int *map, int relative, int *num, int do_nms) {
     #if PJREDDIE
-        return get_network_boxes(net, w, h, thresh, hier, map, relative, num);
+        detection* boxes = get_network_boxes(net, w, h, thresh, hier, map, relative, num);
+        if (do_nms && *num > 0) {
+            do_nms_sort(boxes, *num, boxes[0].classes, thresh);
+        }
     #else
         static const int letter = 1;    // whether image was "letterboxed" to resize maintaining aspect ratio
-        return get_network_boxes(net, w, h, thresh, hier, map, relative, num, letter);
+        detection* boxes = get_network_boxes(net, w, h, thresh, hier, map, relative, num, letter);
+
+        if (do_nms && *num > 0) {
+            layer* yolo = &net->layers[net->n-1];
+            assert(yolo->type == YOLO);
+
+            if (yolo->nms_kind == DEFAULT_NMS) {
+                do_nms_sort(boxes, *num, yolo->classes, thresh);
+            }
+            else {
+                diounms_sort(boxes, *num, yolo->classes, thresh, yolo->nms_kind, yolo->beta_nms);
+            }
+        }
     #endif
+
+    return boxes;
 }
 
 

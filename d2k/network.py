@@ -99,6 +99,7 @@ class Network:
             '[yolo]': {
                 'classes': 20,
                 'num': 1,
+                'nms_kind': 'default',
                 'scale_x_y': 1.0
             }
         }
@@ -292,10 +293,14 @@ class Network:
                     mask = options['mask']
                     anchors = [options['anchors'][m] for m in mask]
                     scale_x_y = options['scale_x_y']
-                    _checkSupported(options, {'num', 'classes', 'mask', 'anchors', 'scale_x_y',
+                    nms_kind = options['nms_kind']
+                    _checkSupported(options, {'num', 'classes', 'mask', 'anchors', 'scale_x_y', 'nms_kind',
                                               # those below are ignored (so far)
-                                               'jitter', 'ignore_thresh', 'truth_thresh', 'random',
+                                               'jitter', 'ignore_thresh', 'truth_thresh', 'random', 'beta_nms',
                                                'iou_loss', 'cls_normalizer', 'iou_normalizer', 'iou_thresh'}) # training only
+
+                    if nms_kind not in ['default', 'greedynms']:
+                        raise ConversionError(f'Unsupported nms_kind {nms_kind}')
 
                     L = f'layer_{i}'
 
@@ -372,7 +377,7 @@ class Network:
         r = BinaryReader(weights)
 
         version = r.read_int32(3)
-        if version != (0,2,0):
+        if not version in [(0,2,0), (0,2,5)]:
             raise ConversionError(f'Unsupported weights format version {version}')
 
         r.read_int32(2) # "seen" (int64)

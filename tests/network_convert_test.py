@@ -678,6 +678,22 @@ def test_convert_yolo_scale_x_y():
     ]
 
 
+def test_convert_yolo_unsupported_nms_kind():
+    cfg = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=200",
+        "channels=2",
+        "",
+        "[yolo]",
+        "anchors=10,10",
+        "nms_kind=foobar"
+    ])
+
+    with pytest.raises(ConversionError):
+        Network.load(cfg).convert()
+
+
 def test_convert_yolo_unsupported_option():
     cfg = '\n'.join([
         "[net]",
@@ -715,8 +731,6 @@ def test_convert_yolov3_doesnt_throw():
     Network.load(cfg).convert()
 
 
-@pytest.mark.skip() # XXX not ready for this yet
-@pytest.mark.skipif(not darknet_has_yolov4, reason='Darknet lacks support')
 def test_convert_yolov4_doesnt_throw():
     with open(yolov4_cfg, 'r') as f:
         cfg = f.read()

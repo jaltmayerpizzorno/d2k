@@ -78,7 +78,8 @@ class darknet:
 
         detection_type = POINTER(_DETECTION_pjreddie) if is_pjreddie() else POINTER(_DETECTION_alexeyab)
 
-        self.helper.d2k_get_network_boxes.argtypes = [c_void_p, c_int, c_int, c_float, c_float, POINTER(c_int), c_int, POINTER(c_int)]
+        self.helper.d2k_get_network_boxes.argtypes = [c_void_p, c_int, c_int, c_float, c_float, POINTER(c_int), c_int, POINTER(c_int),
+                                                      c_int]
         self.helper.d2k_get_network_boxes.restype = detection_type
 
         self.helper.get_net_outputs.argtypes = [c_void_p]
@@ -96,8 +97,6 @@ class darknet:
 
         self.dll.network_width.argtypes = [c_void_p]
         self.dll.network_width.restype = c_int
-
-        self.dll.do_nms_sort.argtypes = [detection_type, c_int, c_int, c_float]
 
         self.dll.free_detections.argtypes = [detection_type, c_int]
 
@@ -181,10 +180,7 @@ class darknet:
     def get_network_boxes(self, image, thresh=.5, hier_thresh=.5, do_nms=False):
         num_boxes = c_int()
         boxes = self.helper.d2k_get_network_boxes(self.net, image.image.w, image.image.h, thresh, hier_thresh,
-                                                  None, 0, ctypes.byref(num_boxes))
-
-        if do_nms and num_boxes.value > 0:
-            self.dll.do_nms_sort(boxes, num_boxes, boxes[0].classes, thresh)
+                                                  None, 0, ctypes.byref(num_boxes), do_nms)
 
         results = []
         for i in range(num_boxes.value):

@@ -307,6 +307,7 @@ def test_load_yolo_anchors_and_defaults():
             "anchors=[(10, 10), (20, 20)]",
             "classes=20",
             "mask=[0, 1]",
+            "nms_kind=default",
             "num=1",    # XXX actually invalid (num must be >=2*len(anchors))
             "scale_x_y=1.0",
             ""
@@ -357,6 +358,7 @@ def test_set_defaults_yolo_no_mask(num):
             "anchors=[(10, 10), (20, 20), (30, 30), (40, 40)]",
             "classes=20",
             f"mask={list(range(num_value))}",
+            "nms_kind=default",
             f"num={num_value}",
             "scale_x_y=1.0",
             "",
@@ -388,6 +390,7 @@ def test_set_defaults_yolo_mask(spec, value):
             "anchors=[(10, 10), (20, 20), (30, 30), (40, 40)]",
             "classes=20",
             f"mask={value}",
+            "nms_kind=default",
             "num=1",
             "scale_x_y=1.0",
             "",
@@ -419,6 +422,7 @@ def test_set_defaults_doesnt_override():
         "anchors=10,10, 20,20, 30,30, 40,40",
         "classes=10",
         "mask=1,2",
+        "nms_kind=greedynms",
         "num=3",
     ])
 
@@ -448,6 +452,7 @@ def test_set_defaults_doesnt_override():
             "anchors=[(10, 10), (20, 20), (30, 30), (40, 40)]",
             "classes=10",
             "mask=[1, 2]",
+            "nms_kind=greedynms",
             "num=3",
             "scale_x_y=1.0",
             "",
@@ -546,6 +551,21 @@ def test_load_route_out_of_range(layer):
         d2k.network.load(cfg)
 
 
+def test_load_route_as_first_layer():
+    cfg = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=200",
+        "channels=2",
+        "",
+        "[route]",
+        "layers=0",
+    ])
+
+    with pytest.raises(d2k.network.ConfigurationError):
+        d2k.network.load(cfg)
+
+
 @pytest.mark.parametrize("spec, result", [('-1', '1'), ('-2', '0')])
 def test_load_resolves_negative_shortcut_layers(spec, result):
     cfg = '\n'.join([
@@ -629,6 +649,5 @@ def test_load_yolov3_doesnt_throw():
     d2k.network.load(yolov3_cfg.read_text())
 
 
-@pytest.mark.skip() # XXX not ready for this yet
 def test_load_yolov4_doesnt_throw():
     d2k.network.load(yolov4_cfg.read_text())
