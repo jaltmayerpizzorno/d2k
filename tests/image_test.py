@@ -44,9 +44,10 @@ def test_resize(tmp_path, width, height):
     np.testing.assert_almost_equal(dn_image, k_image, decimal=7)
 
 
-@pytest.mark.parametrize("width, height", [(100,200), (200,100)])
-def test_letterbox(tmp_path, width, height):
-    image = Image.fromarray(np.random.randint(0, 256, (300, 300, 3), dtype=np.uint8), 'RGB')
+@pytest.mark.parametrize("img_dim", [(200,300,3), (300,200,3), (300,300,3)])
+@pytest.mark.parametrize("width, height", [(100,200), (200,100), (100,100)])
+def test_letterbox(tmp_path, width, height, img_dim):
+    image = Image.fromarray(np.random.randint(0, 256, img_dim, dtype=np.uint8), 'RGB')
     image_file = tmp_path / "image.bmp"
     with open(image_file, "wb") as f:
         image.save(f, format='BMP')
