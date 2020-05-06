@@ -33,6 +33,15 @@ float* d2k_network_predict(network *net, float *input) {
 }
 
 
+float* d2k_network_predict_image(network *net, image im) {
+    #if PJREDDIE
+        return network_predict_image(net, im);
+    #else
+        return network_predict_image_letterbox(net, im);
+    #endif
+}
+
+
 detection* d2k_get_network_boxes(network *net, int w, int h, float thresh, float hier, int *map, int relative, int *num) {
     #if PJREDDIE
         return get_network_boxes(net, w, h, thresh, hier, map, relative, num);

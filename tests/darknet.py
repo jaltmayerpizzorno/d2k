@@ -107,7 +107,7 @@ class darknet:
         self.helper.d2k_network_predict.argtypes = [c_void_p, np.ctypeslib.ndpointer(dtype=c_float, shape=self.input_shape(),
                                                     flags='C')]
 
-        self.dll.network_predict_image.argtypes = [c_void_p, _IMAGE]
+        self.helper.d2k_network_predict_image.argtypes = [c_void_p, _IMAGE]
 
     def __del__(self):
         if self.net != None:
@@ -159,7 +159,7 @@ class darknet:
 
     def predict(self, net_input):
         if isinstance(net_input, darknet.image):
-            self.dll.network_predict_image(self.net, net_input.image)
+            self.helper.d2k_network_predict_image(self.net, net_input.image)
         else:
             assert keras.backend.image_data_format() == 'channels_last'
             net_input = np.ascontiguousarray(net_input.transpose([2,0,1])) # channels last to first

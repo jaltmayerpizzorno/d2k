@@ -416,8 +416,8 @@ def test_yolo_scale_x_y(tmp_path, size, classes, mask, scale_x_y):
     assert not np.isnan(k_output).any()
 
 
-@pytest.mark.parametrize("use_dn_image", [True, False])
-def test_predict_image(tmp_path, use_dn_image):
+@pytest.mark.parametrize("img_dim", [(200,300,3), (300,200,3), (300,300,3)])
+def test_predict_image(tmp_path, img_dim):
     cfg_text = '\n'.join([
         "[net]",
         "height=100",
@@ -437,18 +437,15 @@ def test_predict_image(tmp_path, use_dn_image):
 
     height, width, _ = network.input_shape()
 
-    image = Image.fromarray(np.random.randint(0, 256, (300, 300, 3), dtype=np.uint8), 'RGB')
+    image = Image.fromarray(np.random.randint(0, 256, img_dim, dtype=np.uint8), 'RGB')
     image_file = tmp_path / "image.bmp"
     with open(image_file, "wb") as f:
         image.save(f, format='BMP')
 
     dn_image = darknet.image.load(image_file)
 
-    if use_dn_image:
-        k_image = dn_image.letterbox(width, height).to_array()
-    else:
-        k_image = d2k.image.load(image_file)
-        k_image = d2k.image.letterbox(k_image, width, height)
+    k_image = d2k.image.load(image_file)
+    k_image = d2k.image.letterbox(k_image, width, height)
 
     dn_output = dn.predict(dn_image)
     k_output = k.predict(np.expand_dims(k_image, axis=0)).squeeze(axis=0)
