@@ -9,7 +9,7 @@ clean:
 	- find . -iname __pycache__ -or -iname .pytest_cache | xargs rm -rf
 
 test: helper.so
-	python -m pytest tests
+	python -m pytest -vx tests
 
 helper.so: helper.c libdarknet.so
 	$(CC) $(CFLAGS) -shared $^ -o $@ libdarknet.so
