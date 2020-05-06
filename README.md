@@ -12,7 +12,7 @@ Most everything was implemented test-first and the results match
 and [YOLOv4's Darknet](https://github.com/AlexeyAB/darknet)
 (allowing for floating point error fun).
 
-D2K is inference-only so far...  Re-training is where things really get fun, though,
+D2K is inference-only so far...  (Re-)training is where things really get fun, though,
 so I'll be looking into adding it as time allows.
 
 ![Sample YOLOv3 detections for COCO classes](etc/dog-detection.png)
@@ -97,7 +97,8 @@ included here for convenience.
 ## TODOs
 
 - add training support
-- look to support additional (non-YOLOv3) layers
+- move non-max suppression into the neural network
+- look to support additional layers
 
 ## Other Darknet and YOLO
 
