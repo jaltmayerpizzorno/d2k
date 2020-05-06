@@ -1,33 +1,39 @@
-# d2k: YOLOv3 in Keras / Tensorflow 2.1, test-first
+# d2k: YOLOv4/v3 in Keras / Tensorflow 2.1, test-first
 
 [![license](https://img.shields.io/github/license/mashape/apistatus.svg)](LICENSE)
 
 ## Welcome to d2k
 
-D2K reimplements the [YOLOv3](https://pjreddie.com/media/files/papers/YOLOv3.pdf) object detection algorithm
-by Joseph Redmon and Ali Farhadi in Keras/TensorFlow 2.1.0.
-Most everything was implemented test-first and matches [Darknet](https://github.com/pjreddie/darknet)
+D2K reimplements the [YOLOv4](https://arxiv.org/abs/2004.10934) and
+[YOLOv3](https://pjreddie.com/media/files/papers/YOLOv3.pdf) object detection algorithms
+ in Keras/TensorFlow 2.1.0.
+Most everything was implemented test-first and the results match
+[the original Darknet](https://github.com/pjreddie/darknet)
+and [YOLOv4's Darknet](https://github.com/AlexeyAB/darknet)
 (allowing for floating point error fun).
 
-D2K is inference-only so far...  I'll look into adding training as time allows.
+D2K is inference-only so far...  Re-training is where things really get fun, though,
+so I'll be looking into adding it as time allows.
 
 ![Sample YOLOv3 detections for COCO classes](etc/dog-detection.png)
 
 ## Quick Start
 
-The YOLOv3 weights file is too big for checking into GitHub directly, but
+The YOLOv3/YOLOv4 weights files are too big for checking into GitHub directly, but
 if you have [Git LFS](https://git-lfs.github.com/) set up, cloning the repository
-should get you a copy.  Otherwise, after cloning you'll need to get it from the
+should get you copies.  Otherwise, after cloning you'll need to get it from the
 Darknet site:
 ```bash
-pushd darknet
+pushd darknet-files
 wget https://pjreddie.com/media/files/yolov3.weights
 popd
 ```
+See [the YOLOv4 GitHub page](https://github.com/AlexeyAB/darknet) for where to
+download the yolov4 weights.
 
 You shouldn't have to install anything.  On an Python 3, Tensorflow 2 environment try:
 ```bash
-python yolov3.py tests/data/dog.png
+python yolo.py tests/data/dog.png
 ```
 
 In Python, using it is as simple as, for example,
@@ -49,6 +55,7 @@ For the tests, you'll need Darknet built on `../darknet`, as I embed it using
 [my clone of Darknet](https://github.com/jaltmayerpizzorno/darknet) given a couple
 of small bugs I fixed (found while coding this project) and also an adjustment
 to gcc options.
+There is an equivalent [branch for YOLOv4](https://github.com/jaltmayerpizzorno/darknet/tree/alexeyab-master).
 ```bash
 pushd ..
 git clone https://github.com/jaltmayerpizzorno/darknet.git
@@ -62,16 +69,29 @@ popd
 make test
 ```
 
+### To see the network used
+To see the Keras/Tensorflow NN used, you can pass `--print` to `yolo.py`:
+```bash
+python yolo.py --version 4 --print
+
+layer_in = keras.Input(shape=(608, 608, 3))
+layer_0 = keras.layers.ZeroPadding2D(((1,1),(1,1)))(layer_in)
+layer_0 = keras.layers.Conv2D(32, 3, strides=1, use_bias=False, name='conv_0')(layer_0)
+layer_0 = keras.layers.BatchNormalization(epsilon=.00001, name='bn_0')(layer_0)
+layer_0 = layer_0 * K.tanh(K.switch(layer_0 > 20, layer_0, K.switch(layer_0 < -20, K.exp(layer_0), K.log(K.exp(layer_0)+1))))
+layer_1 = keras.layers.ZeroPadding2D(((1,1),(1,1)))(layer_0)
+...
+```
+
+
 ## More Information
 
 The `d2k.network.Network` class reads a Darknet configuration file and generates an equivalent
 Keras model;  its `convert()` outputs a list of Python statements building the model, making it
-easy to check (and incorporate elsewhere if desired).  It can also read Darknet YOLOv3
+easy to check (and incorporate elsewhere if desired).  It can also read Darknet YOLOv3/YOLOv4
 weights into the resulting model, for use and/or for serializing for later use.
 
-Some of the computation is done in a custom Keras layer.
-
-The files under `darknet` are all originally from [Darknet](https://github.com/pjreddie/darknet),
+The files under `darknet-files` are all originally from the Darknet authors,
 included here for convenience.
 
 ## TODOs
