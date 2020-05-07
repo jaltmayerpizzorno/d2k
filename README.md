@@ -4,7 +4,7 @@
 
 ## Welcome to d2k
 
-D2K reimplements the [YOLOv4](https://arxiv.org/abs/2004.10934) and
+D2K implements the [YOLOv4](https://arxiv.org/abs/2004.10934) and
 [YOLOv3](https://pjreddie.com/media/files/papers/YOLOv3.pdf) object detection algorithms
  in Keras/TensorFlow 2.1.0.
 Most everything was implemented test-first and the results match
@@ -96,6 +96,7 @@ included here for convenience.
 
 ## TODOs
 
+- fix .h5 YOLOv4 model save issue
 - add training support
 - move non-max suppression into the neural network
 - look to support additional layers
