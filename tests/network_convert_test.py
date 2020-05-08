@@ -125,8 +125,9 @@ def test_convert_convolutional_activation_mish():
         "layer_in = keras.Input(shape=(100, 200, 3))",
         "layer_0 = keras.layers.ZeroPadding2D(((1,1),(1,1)))(layer_in)",
         "layer_0 = keras.layers.Conv2D(32, 3, strides=2, use_bias=True, name='conv_0')(layer_0)",
-        "layer_0 = layer_0 * K.tanh(K.switch(layer_0 > 20, layer_0, " +
-                                   "K.switch(layer_0 < -20, K.exp(layer_0), K.log(K.exp(layer_0)+1))))",
+        "layer_0_softplus = tf.where(layer_0 > 20.0, layer_0, " +
+                                    "tf.where(layer_0 < -20.0, K.exp(layer_0), K.softplus(layer_0)))",
+        "layer_0 = layer_0 * K.tanh(layer_0_softplus)",
         "layer_out = layer_0"
     ]
 

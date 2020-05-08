@@ -96,7 +96,6 @@ included here for convenience.
 
 ## TODOs
 
-- fix .h5 YOLOv4 model save issue
 - add training support
 - move non-max suppression into the neural network
 - look to support additional layers
