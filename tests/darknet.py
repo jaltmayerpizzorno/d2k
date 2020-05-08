@@ -112,14 +112,12 @@ class darknet:
         if self.net != None:
             self.helper.d2k_free_network(self.net)
 
-    def input_size(self):
-        return self.helper.d2k_network_inputs(self.net)
-
     def input_shape(self):
+        size = self.helper.d2k_network_inputs(self.net)
         height = self.dll.network_height(self.net)
         width = self.dll.network_width(self.net)
 
-        return (self.input_size()//height//width, height, width)
+        return (size//height//width, height, width)
 
     class image:
         dll = ctypes.CDLL(DARKNET_DLL, ctypes.RTLD_GLOBAL)
