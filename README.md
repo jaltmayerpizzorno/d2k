@@ -78,9 +78,11 @@ layer_in = keras.Input(shape=(608, 608, 3))
 layer_0 = keras.layers.ZeroPadding2D(((1,1),(1,1)))(layer_in)
 layer_0 = keras.layers.Conv2D(32, 3, strides=1, use_bias=False, name='conv_0')(layer_0)
 layer_0 = keras.layers.BatchNormalization(epsilon=.00001, name='bn_0')(layer_0)
-layer_0 = layer_0 * K.tanh(K.switch(layer_0 > 20, layer_0, K.switch(layer_0 < -20, K.exp(layer_0), K.log(K.exp(layer_0)+1))))
+layer_0 = layer_0 * K.tanh(K.softplus(layer_0))
 layer_1 = keras.layers.ZeroPadding2D(((1,1),(1,1)))(layer_0)
+layer_1 = keras.layers.Conv2D(64, 3, strides=2, use_bias=False, name='conv_1')(layer_1)
 ...
+
 ```
 
 
