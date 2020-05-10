@@ -233,14 +233,7 @@ class Network:
                     if activation == 'leaky':
                         net.append(f'layer_{i} = keras.layers.LeakyReLU(alpha=.1)(layer_{i})')
                     elif activation == 'mish':
-                        MISH_THRESH = 20.0  # as per (darknet)/src/activation_kernels.cu
-
-                        # We use tf.where instead of K.switch because the latter causes an error saving the model as .h5:
-                        # ("ValueError: Unable to create group (name already exists)"
-                        net.append(f'layer_{i}_softplus = tf.where(layer_{i} > {MISH_THRESH}, layer_{i}, ' +
-                                                                 f'tf.where(layer_{i} < -{MISH_THRESH}, K.exp(layer_{i}), ' +
-                                                                          f'K.softplus(layer_{i})))')
-                        net.append(f'layer_{i} = layer_{i} * K.tanh(layer_{i}_softplus)')
+                        net.append(f'layer_{i} = layer_{i} * K.tanh(K.softplus(layer_{i}))')
                     elif activation != 'linear':
                         raise ConversionError(f'Unsupported activation "{activation}"')
 

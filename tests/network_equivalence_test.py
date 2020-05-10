@@ -27,7 +27,7 @@ def rand_float32(shape, decimals=4):
 
 
 class DummyWeightsWriter:
-    def __init__(self, config, version_0_2=True):
+    def __init__(self, config, version_0_2=True, identity=False):
         self.data = []
         if version_0_2:
             self.write_int32(0)  # major
@@ -58,9 +58,15 @@ class DummyWeightsWriter:
                     self.write_float32(1.0 + .5 * rand_float32(filters))  # var
                 else:
                     # Darknet saves (bias) (out_dim, in_dim, height, width)
-                    self.write_float32(rand_float32(filters))  # bias
+                    if identity:
+                        self.write_float32(np.full((filters), 0.))
+                    else:
+                        self.write_float32(rand_float32(filters))  # bias
 
-                self.write_float32(.2 * rand_float32((filters, in_dim, size, size)))
+                if identity:
+                    self.write_float32(np.full((filters, in_dim, size, size), 1.))
+                else:
+                    self.write_float32(.2 * rand_float32((filters, in_dim, size, size)))
 
                 in_dim = filters
 
@@ -90,13 +96,13 @@ class DummyWeightsWriter:
         return bytes().join(self.data)
 
 
-def make_networks(tmp_path, cfg_text):
+def make_networks(tmp_path, cfg_text, identity=False):
     cfg_file = tmp_path / "testnet.cfg"
     weights_file = tmp_path / "testnet.weights"
 
     network = d2k.network.load(cfg_text)
 
-    ww = DummyWeightsWriter(network.config)
+    ww = DummyWeightsWriter(network.config, identity=identity)
 
     k = network.make_model(ww.get_weights(), just_activate_yolo=True)
 
@@ -176,6 +182,35 @@ def test_convolutional(tmp_path, size, stride, pad, activation, bn):
     ])
 
     compare_dn_to_keras(tmp_path, cfg_text, decimal=6 if activation != 'mish' else 5)
+
+
+@pytest.mark.skipif(not darknet_has_yolov4, reason='mish not supported by Darknet otherwise')
+def test_mish_beyond_threshold(tmp_path):
+    height = 10
+    width = 10
+    cfg_text = '\n'.join([
+        "[net]",
+        f"height={height}",
+        f"width={width}",
+        "channels=1",
+        "",
+        "[convolutional]",
+        "filters=1",
+        "size=1",
+        "activation=mish",
+    ])
+
+    dn, k, network = make_networks(tmp_path, cfg_text, identity=True)
+    
+    np.set_printoptions(threshold=np.inf)
+
+    net_input = np.arange(-(height*width)//2, (height*width)-(height*width//2)).astype('float32').reshape(height,width,1)
+
+    dn_output = dn.predict(net_input)
+    k_output = k.predict(np.expand_dims(net_input, axis=0)).squeeze(axis=0)
+
+    np.testing.assert_almost_equal(k_output, dn_output, decimal=6)
+    assert not np.isnan(k_output).any()
 
 
 # size=1 stride>1 not supported by darknet
