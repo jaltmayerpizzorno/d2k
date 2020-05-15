@@ -472,8 +472,8 @@ def test_boxes_from_darknet_output(image_stem, yolo):
 
     network = d2k.network.load((darknet_files / (yolo + '.cfg')).read_text())
 
-    image_dim = (image.shape[1], image.shape[0])
-    net_dim = (network.input_shape()[1], network.input_shape()[0])
+    image_dim = image.shape[1::-1]
+    net_dim = network.input_shape()[1::-1]
 
     dn_output = d2k.network.post_just_activate(dn_output, network.config)
     k_boxes = d2k.network.boxes_from_output(dn_output, net_dim, image_dim)
@@ -539,7 +539,7 @@ def test_end_to_end(image_stem, yolo, use_detect_image):
     else:
         net_h, net_w, _ = network.input_shape()
 
-        image_dim = (image.shape[1], image.shape[0])
+        image_dim = image.shape[1::-1]
         image = d2k.image.letterbox(image, net_w, net_h)
 
         k_output = k.predict(np.expand_dims(image, axis=0))
