@@ -437,7 +437,6 @@ class Network:
         g = globals().copy()
         l = locals().copy()
         exec('import tensorflow.keras.backend as K', g, l)
-#        print('\n'.join(self.convert(just_activate_yolo=just_activate_yolo)))
         exec('\n'.join(self.convert(just_activate_yolo=just_activate_yolo)), g, l)
         model = keras.Model(l['layer_in'], l['layer_out'])
         if weights != None: self._read_weights(model, weights)
