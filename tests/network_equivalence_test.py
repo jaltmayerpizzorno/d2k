@@ -104,7 +104,7 @@ def make_networks(tmp_path, cfg_text, identity=False):
 
     ww = DummyWeightsWriter(network.config, identity=identity)
 
-    k = network.make_model(ww.get_weights(), just_activate_yolo=True)
+    k = network.make_model(ww.get_weights(), decode_grid=False)
 
     cfg_file.write_text(cfg_text)
     weights_file.write_bytes(ww.get_weights())
@@ -475,7 +475,7 @@ def test_boxes_from_darknet_output(image_stem, yolo):
     image_dim = image.shape[1::-1]
     net_dim = network.input_shape()[1::-1]
 
-    dn_output = d2k.network.post_just_activate(dn_output, network.config)
+    dn_output = network.decode_yolo_grid(dn_output)
     k_boxes = d2k.network.boxes_from_output(dn_output, net_dim, image_dim)
     k_boxes = np.array([b.to_list() for b in k_boxes], dtype=np.float32)
 
@@ -504,7 +504,7 @@ def test_yolo_network(image_stem, yolo):
     _, dn_output, _, _ = darknet_compute(yolo, image_file)
 
     network = d2k.network.load((darknet_files / (yolo + '.cfg')).read_text())
-    k = network.make_model((darknet_files / (yolo + '.weights')).read_bytes(), just_activate_yolo=True)
+    k = network.make_model((darknet_files / (yolo + '.weights')).read_bytes(), decode_grid=False)
 
     net_h, net_w, _ = network.input_shape()
 

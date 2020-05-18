@@ -181,14 +181,14 @@ class Network:
         return (net_options['height'], net_options['width'], net_options['channels'])
 
 
-    def convert(self, just_activate_yolo=False):
+    def convert(self, decode_grid=True):
         """Returns a list of Python statements defining a Keras network equivalent to this Network.
 
            Raises ConversionError in case or errors.
 
            Arguments:
-           just_activate_yolo -- has Yolo layers only perform activation, like in (non-training) Darknet,
-                                 to facilitate comparison (default: False)
+           decode_grid -- decode box coordinates from YOLO layers' grids.  Turn off to facilitate
+                          comparing with Darknet (default: True)
         """
         def _checkSupported(options, supportedSet):
              assert isinstance(supportedSet, set)
@@ -312,7 +312,7 @@ class Network:
                     net.append(f'{L}_obj_classes = keras.activations.sigmoid({L}[...,4:])')
                     net.append(f'{L} = K.concatenate(({L}_xy, {L}_wh, {L}_obj_classes))')
 
-                    if not just_activate_yolo:
+                    if decode_grid:
                         net.append(f'{L}_l_w, {L}_l_h = K.int_shape({L})[1:3]')
                         net.append(f'{L}_range_w = K.reshape(K.arange(0, {L}_l_w, dtype="float32"), (1, 1, {L}_l_w, 1, 1))')
                         net.append(f'{L}_range_h = K.reshape(K.arange(0, {L}_l_h, dtype="float32"), (1, {L}_l_h, 1, 1, 1))')
@@ -326,9 +326,7 @@ class Network:
                         net.append(f'{L}_y = ({L}[...,1:2] + {L}_range_h) / {L}_l_h')
                         net.append(f'{L}_w = (K.exp({L}[...,2:3]) * {L}_anchors_w) / {net_options["width"]}')
                         net.append(f'{L}_h = (K.exp({L}[...,3:4]) * {L}_anchors_h) / {net_options["height"]}')
-                        net.append(f'{L}_objectness = {L}[...,4:5]')
-                        net.append(f'{L}_classes = {L}[...,5:] * {L}_objectness')
-                        net.append(f'{L} = K.concatenate(({L}_x, {L}_y, {L}_w, {L}_h, {L}_objectness, {L}_classes))')
+                        net.append(f'{L} = K.concatenate(({L}_x, {L}_y, {L}_w, {L}_h, {L}_obj_classes))')
 
                 else:
                     raise ConversionError(f'Unsupported section {section}')
@@ -421,15 +419,15 @@ class Network:
         assert r.at_eof()
 
 
-    def make_model(self, weights=None, just_activate_yolo=False):
+    def make_model(self, weights=None, decode_grid=True):
         """Returns a Keras model equivalent to this Network.
 
            Raises ConversionError in case of errors.
 
            Arguments:
            weights -- darknet weights to load into model, as a binary string
-           just_activate_yolo -- has Yolo layers only perform activation, like in (non-training) Darknet,
-                                 to facilitate comparison (default: False)
+           decode_grid -- decode box coordinates from YOLO layers' grids.  Turn off to facilitate
+                          comparing with Darknet (default: True)
         """
 
         import tensorflow.keras as keras
@@ -437,56 +435,56 @@ class Network:
         g = globals().copy()
         l = locals().copy()
         exec('import tensorflow.keras.backend as K', g, l)
-        exec('\n'.join(self.convert(just_activate_yolo=just_activate_yolo)), g, l)
+        exec('\n'.join(self.convert(decode_grid=decode_grid)), g, l)
         model = keras.Model(l['layer_in'], l['layer_out'])
         if weights != None: self._read_weights(model, weights)
         return model
 
 
+    def decode_yolo_grid(self, output):
+        """Decodes the box coordinates output by the YOLO grids on this network.
+           Our models already performs this decoding (unless 'decode_grid=False' is passed),
+           but Darknet's network doesn't.
+        """
+        yolo_config = [layer[1] for layer in self.config if layer[0] == '[yolo]']
+        assert len(yolo_config) > 0, "No YOLO layers on this network"
+
+        # We need to try to keep computations using float32/int32 to stay
+        # as close to darknet as possible.
+
+        net_width = np.int32(self.config[0][1]['width'])
+        net_height = np.int32(self.config[0][1]['height'])
+
+        result = []
+        for l_out, l in zip(output, yolo_config):
+            l_h, l_w = l_out.shape[0:2]
+            l_m = len(l['mask'])
+            l_out = l_out.reshape((l_h, l_w, l_m, l['classes']+4+1))
+
+            l_anchors_w = np.array([l['anchors'][x][0] for x in l['mask']], dtype=np.float32).reshape(1,1,l_m,1)
+            l_anchors_h = np.array([l['anchors'][x][1] for x in l['mask']], dtype=np.float32).reshape(1,1,l_m,1)
+
+            # x = (col + l_out[row, col, m, 0]) / l_w
+            x = (l_out[...,0:1] + np.arange(l_w, dtype=np.float32).reshape(1,l_w,1,1)) / l_w
+
+            # y = (row + l_out[row, col, m, 1]) / l_h
+            y = (l_out[...,1:2] + np.arange(l_h, dtype=np.float32).reshape(l_h,1,1,1)) / l_h
+
+            # w = np.exp(l_out[row, col, m, 2]) * l_anchors[m][0] / net_width
+            w = (np.exp(l_out[...,2:3], dtype=np.float32) * l_anchors_w) / net_width
+
+            # h = np.exp(l_out[row, col, m, 3]) * l_anchors[m][1] / net_height
+            h = (np.exp(l_out[...,3:4], dtype=np.float32) * l_anchors_h) / net_height
+
+            obj_classes = l_out[...,4:]
+
+            result.append(np.concatenate([x, y, w, h, obj_classes], axis=3))
+
+        return result
+
+
 def load(cfg):
     return Network.load(cfg)
-
-
-def post_just_activate(output, config):
-    """Performs the steps our Yolo layer normally performs (with just_activate=False) but Darknet's doesn't.
-       Really just intended to facilitate testing.
-    """
-    yolo_config = [layer[1] for layer in config if layer[0] == '[yolo]']
-
-    # We need to try to keep computations using float32/int32 to stay
-    # as close to darknet as possible.
-
-    net_width = np.int32(config[0][1]['width'])
-    net_height = np.int32(config[0][1]['height'])
-
-    result = []
-    for l_out, l in zip(output, yolo_config):
-        l_h, l_w = l_out.shape[0:2]
-        l_m = len(l['mask'])
-        l_out = l_out.reshape((l_h, l_w, l_m, l['classes']+4+1))
-
-        l_anchors_w = np.array([l['anchors'][x][0] for x in l['mask']], dtype=np.float32).reshape(1,1,l_m,1)
-        l_anchors_h = np.array([l['anchors'][x][1] for x in l['mask']], dtype=np.float32).reshape(1,1,l_m,1)
-
-        # x = (col + l_out[row, col, m, 0]) / l_w
-        x = (l_out[...,0:1] + np.arange(l_w, dtype=np.float32).reshape(1,l_w,1,1)) / l_w
-
-        # y = (row + l_out[row, col, m, 1]) / l_h
-        y = (l_out[...,1:2] + np.arange(l_h, dtype=np.float32).reshape(l_h,1,1,1)) / l_h
-
-        # w = np.exp(l_out[row, col, m, 2]) * l_anchors[m][0] / net_width
-        w = (np.exp(l_out[...,2:3], dtype=np.float32) * l_anchors_w) / net_width
-
-        # h = np.exp(l_out[row, col, m, 3]) * l_anchors[m][1] / net_height
-        h = (np.exp(l_out[...,3:4], dtype=np.float32) * l_anchors_h) / net_height
-
-        # classes = l_out[row, col, m, 5:] * objectness
-        objectness = l_out[...,4:5]
-        classes = l_out[..., 5:] * objectness
-
-        result.append(np.concatenate([x, y, w, h, objectness, classes], axis=3))
-
-    return result
 
 
 def boxes_from_output(output, net_dim, img_dim, thresh=.5):
@@ -554,12 +552,13 @@ def boxes_from_output(output, net_dim, img_dim, thresh=.5):
         objectness = l_out[...,4:5]
         classes = l_out[..., 5:]
 
-        classes[classes < thresh] = 0
-
         got_obj = np.squeeze(objectness >= thresh, axis=3)
         x, y, w, h, objectness, classes = [a[got_obj] for a in [x, y, w, h, objectness, classes]]
 
         x, y, w, h = _correct_boxes((x, y, w, h), img_dim, net_dim)
+
+        classes *= objectness
+        classes[classes < thresh] = 0
 
         boxes += d2k.box.boxes_from_array(np.concatenate([x, y, w, h, objectness, classes], axis=1))
 

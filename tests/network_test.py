@@ -1195,9 +1195,7 @@ def test_convert_yolo_single():
         'layer_0_y = (layer_0[...,1:2] + layer_0_range_h) / layer_0_l_h',
         'layer_0_w = (K.exp(layer_0[...,2:3]) * layer_0_anchors_w) / 200',
         'layer_0_h = (K.exp(layer_0[...,3:4]) * layer_0_anchors_h) / 100',
-        'layer_0_objectness = layer_0[...,4:5]',
-        'layer_0_classes = layer_0[...,5:] * layer_0_objectness',
-        'layer_0 = K.concatenate((layer_0_x, layer_0_y, layer_0_w, layer_0_h, layer_0_objectness, layer_0_classes))',
+        'layer_0 = K.concatenate((layer_0_x, layer_0_y, layer_0_w, layer_0_h, layer_0_obj_classes))',
         "layer_out = layer_0",
     ]
 
@@ -1245,9 +1243,7 @@ def test_convert_yolo_multiple():
         'layer_1_y = (layer_1[...,1:2] + layer_1_range_h) / layer_1_l_h',
         'layer_1_w = (K.exp(layer_1[...,2:3]) * layer_1_anchors_w) / 200',
         'layer_1_h = (K.exp(layer_1[...,3:4]) * layer_1_anchors_h) / 100',
-        'layer_1_objectness = layer_1[...,4:5]',
-        'layer_1_classes = layer_1[...,5:] * layer_1_objectness',
-        'layer_1 = K.concatenate((layer_1_x, layer_1_y, layer_1_w, layer_1_h, layer_1_objectness, layer_1_classes))',
+        'layer_1 = K.concatenate((layer_1_x, layer_1_y, layer_1_w, layer_1_h, layer_1_obj_classes))',
         "layer_2 = layer_0",
         'layer_3 = K.reshape(layer_2, (-1, *K.int_shape(layer_2)[1:3], 1, 15))',
         'layer_3_xy = keras.activations.sigmoid(layer_3[...,0:2])',
@@ -1263,15 +1259,13 @@ def test_convert_yolo_multiple():
         'layer_3_y = (layer_3[...,1:2] + layer_3_range_h) / layer_3_l_h',
         'layer_3_w = (K.exp(layer_3[...,2:3]) * layer_3_anchors_w) / 200',
         'layer_3_h = (K.exp(layer_3[...,3:4]) * layer_3_anchors_h) / 100',
-        'layer_3_objectness = layer_3[...,4:5]',
-        'layer_3_classes = layer_3[...,5:] * layer_3_objectness',
-        'layer_3 = K.concatenate((layer_3_x, layer_3_y, layer_3_w, layer_3_h, layer_3_objectness, layer_3_classes))',
+        'layer_3 = K.concatenate((layer_3_x, layer_3_y, layer_3_w, layer_3_h, layer_3_obj_classes))',
 
         "layer_out = [layer_1, layer_3]",
     ]
 
 
-def test_convert_just_activate_yolo():
+def test_convert_decode_grid_False():
     cfg = '\n'.join([
         "[net]",
         "height=100",
@@ -1284,7 +1278,7 @@ def test_convert_just_activate_yolo():
         "anchors=10,10, 20,20",
     ])
 
-    net = d2k.network.load(cfg).convert(just_activate_yolo=True)
+    net = d2k.network.load(cfg).convert(decode_grid=False)
     assert net == [
         "layer_in = keras.Input(shape=(100, 200, 3))",
         "layer_0 = K.reshape(layer_in, (-1, *K.int_shape(layer_in)[1:3], 2, 15))",
@@ -1310,7 +1304,7 @@ def test_convert_yolo_scale_x_y():
         "scale_x_y=1.1",
     ])
 
-    net = d2k.network.load(cfg).convert(just_activate_yolo=True)
+    net = d2k.network.load(cfg).convert(decode_grid=False)
     assert net == [
         "layer_in = keras.Input(shape=(100, 200, 3))",
         "layer_0 = K.reshape(layer_in, (-1, *K.int_shape(layer_in)[1:3], 2, 15))",
