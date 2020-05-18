@@ -499,7 +499,7 @@ def boxes_from_output(output, net_dim, img_dim, thresh=.5):
        thresh -- class detection threshold (default: .5)
     """
 
-    def _correct_boxes(box, img_dim, net_dim):
+    def _correct_boxes(box, img_dim, net_dim, letterbox=True):
         x, y, w, h = box
         img_w, img_h = img_dim
         net_w, net_h = net_dim
@@ -515,23 +515,23 @@ def boxes_from_output(output, net_dim, img_dim, thresh=.5):
         assert net_w.dtype == np.int32
         assert net_h.dtype == np.int32
 
-        # this reverses the effect of dk2.image.letterbox
-        if (net_w/img_w) < (net_h/img_h):
-            new_w = net_w
-            new_h = (img_h * net_w) // img_w
-        else:
-            new_h = net_h
-            new_w = (img_w * net_h) // img_h
+        if letterbox:   # this reverses the effect of dk2.image.letterbox
+            if (net_w/img_w) < (net_h/img_h):
+                new_w = net_w
+                new_h = (img_h * net_w) // img_w
+            else:
+                new_h = net_h
+                new_w = (img_w * net_h) // img_h
 
-        new_h = new_h.astype(np.float32)
-        new_w = new_w.astype(np.float32)
-        net_h = net_h.astype(np.float32)
-        net_w = net_w.astype(np.float32)
+            new_h = new_h.astype(np.float32)
+            new_w = new_w.astype(np.float32)
+            net_h = net_h.astype(np.float32)
+            net_w = net_w.astype(np.float32)
 
-        x = (x - (net_w - new_w)/np.float32(2.)/net_w) / (new_w/net_w)
-        y = (y - (net_h - new_h)/np.float32(2.)/net_h) / (new_h/net_h)
-        w *= (net_w / new_w)
-        h *= (net_h / new_h)
+            x = (x - (net_w - new_w)/np.float32(2.)/net_w) / (new_w/net_w)
+            y = (y - (net_h - new_h)/np.float32(2.)/net_h) / (new_h/net_h)
+            w *= (net_w / new_w)
+            h *= (net_h / new_h)
 
         x *= img_w
         w *= img_w
