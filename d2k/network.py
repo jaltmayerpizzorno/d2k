@@ -512,7 +512,7 @@ def boxes_from_output(output, net_dim, img_dim, thresh=.5):
         classes *= objectness
         classes[classes < thresh] = 0
 
-        d2k.box.letterbox_transform(detections, net_dim, img_dim, reverse=True)
+        d2k.box.letterbox_transform(detections, img_dim, net_dim, reverse=True)
 
         xy = detections[...,0:2]
         wh = detections[...,2:4]

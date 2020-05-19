@@ -174,3 +174,73 @@ def test_nms_boxes_thresh():
                       [100, 50, 60, 20, .5, .9, .7],
                       [105, 55, 60, 20, .5, .6, .8],
                      ]), nms, decimal=7)
+
+
+def test_letterbox_transform_landscape():
+    img_dim = np.array([200, 100])
+    net_dim = np.array([50, 50])
+
+    boxes = np.array([[100., 10., 100., 50., 1., 1.],
+                      [100., 20.,  10., 10., 1., 1.],
+                      [20.,  50.,  10., 10., 1., 1.]])
+
+    boxes[...,0:2] /= img_dim
+    boxes[...,2:4] /= img_dim
+
+    d2k.box.letterbox_transform(boxes, img_dim, net_dim)
+
+    boxes[...,0:2] *= net_dim
+    boxes[...,2:4] *= net_dim
+
+    np.testing.assert_almost_equal(boxes, np.array(
+                    [[25., 15. ,  25., 12.5,  1.,  1.],
+                     [25., 17.5,  2.5,  2.5,  1.,  1.],
+                     [ 5., 25. ,  2.5,  2.5,  1.,  1.]]))
+
+    boxes[...,0:2] /= net_dim
+    boxes[...,2:4] /= net_dim
+
+    d2k.box.letterbox_transform(boxes, img_dim, net_dim, reverse=True)
+
+    boxes[...,0:2] *= img_dim
+    boxes[...,2:4] *= img_dim
+
+    np.testing.assert_almost_equal(boxes, np.array(
+                     [[100., 10., 100., 50., 1., 1.],
+                      [100., 20.,  10., 10., 1., 1.],
+                      [20.,  50.,  10., 10., 1., 1.]]))
+
+
+def test_letterbox_transform_portrait():
+    img_dim = np.array([200, 400])
+    net_dim = np.array([50, 50])
+
+    boxes = np.array([[100., 10., 100., 50., 1., 1.],
+                      [100., 20.,  10., 10., 1., 1.],
+                      [20.,  50.,  10., 10., 1., 1.]])
+
+    boxes[...,0:2] /= img_dim
+    boxes[...,2:4] /= img_dim
+
+    d2k.box.letterbox_transform(boxes, img_dim, net_dim)
+
+    boxes[...,0:2] *= net_dim
+    boxes[...,2:4] *= net_dim
+
+    np.testing.assert_almost_equal(boxes, np.array(
+                    [[25.,  1.25, 12.5 ,  6.25,  1.,  1.],
+                     [25.,  2.5 ,  1.25,  1.25,  1.,  1.],
+                     [15.,  6.25,  1.25,  1.25,  1.,  1.]]))
+
+    boxes[...,0:2] /= net_dim
+    boxes[...,2:4] /= net_dim
+
+    d2k.box.letterbox_transform(boxes, img_dim, net_dim, reverse=True)
+
+    boxes[...,0:2] *= img_dim
+    boxes[...,2:4] *= img_dim
+
+    np.testing.assert_almost_equal(boxes, np.array(
+                     [[100., 10., 100., 50., 1., 1.],
+                      [100., 20.,  10., 10., 1., 1.],
+                      [20.,  50.,  10., 10., 1., 1.]]))
