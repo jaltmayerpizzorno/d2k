@@ -97,6 +97,53 @@ def boxes_from_array(boxes_array):
     return [Box.from_array(b) for b in boxes_array]
 
 
+def letterbox_transform(boxes, net_dim, img_dim, reverse=False):
+    """Transforms the box coordinates corresponding to "letterboxing" an image, i.e., resizing and
+       padding it so that it fits the network's dimensions while retaining the aspect ratio.
+       See d2k.image.letterbox
+
+       Arguments:
+       boxes -- NumPy array of boxes starting with [x,y,w,h]
+       net_dim -- 1x2 NumPy array with the network's width and height
+       img_dim -- 1x2 NumPy array with the image's width and height
+       reverse -- whether to reverse the transformation (default: False)
+    """
+       
+    x = boxes[...,0]
+    y = boxes[...,1]
+    w = boxes[...,2]
+    h = boxes[...,3]
+
+    img_w, img_h = img_dim
+    net_w, net_h = net_dim
+
+    if (net_w/img_w) < (net_h/img_h):
+        # embedding: x just scaled, y scaled & padded
+        emb_w = net_w
+        emb_h = (img_h * net_w) // img_w
+    else:
+        # embedding: y just scaled, x scaled & padded
+        emb_w = (img_w * net_h) // img_h
+        emb_h = net_h
+
+    if reverse:
+        x = (x - (net_w - emb_w)/np.float32(2.)/net_w) / (emb_w/net_w)
+        y = (y - (net_h - emb_h)/np.float32(2.)/net_h) / (emb_h/net_h)
+        w /= (emb_w/net_w)
+        h /= (emb_h/net_h)
+    else:
+        assert False, "not implemented -- add tests and implement"
+#        x = x * (emb_w/net_w) + (net_w - emb_w)/np.float32(2.)/net_w
+#        y = y * (emb_h/net_h) + (net_h - emb_h)/np.float32(2.)/net_h
+#        w *= (emb_w/net_w)
+#        h *= (emb_h/net_h)
+
+    boxes[...,0] = x
+    boxes[...,1] = y
+    boxes[...,2] = w
+    boxes[...,3] = h
+
+
 def draw_boxes(im, boxes, names=None):
     if len(boxes) == 0: return
 

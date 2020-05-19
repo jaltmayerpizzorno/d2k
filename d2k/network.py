@@ -497,70 +497,30 @@ def boxes_from_output(output, net_dim, img_dim, thresh=.5):
        thresh -- class detection threshold (default: .5)
     """
 
-    def _correct_boxes(box, img_dim, net_dim, letterbox=True):
-        x, y, w, h = box
-        img_w, img_h = img_dim
-        net_w, net_h = net_dim
-
-        # We need to try to keep computations using float32/int32 to stay
-        # as close to darknet as possible.
-        assert x.dtype == np.float32
-        assert y.dtype == np.float32
-        assert w.dtype == np.float32
-        assert h.dtype == np.float32
-        assert img_w.dtype == np.int32
-        assert img_h.dtype == np.int32
-        assert net_w.dtype == np.int32
-        assert net_h.dtype == np.int32
-
-        if letterbox:   # this reverses the effect of dk2.image.letterbox
-            if (net_w/img_w) < (net_h/img_h):
-                new_w = net_w
-                new_h = (img_h * net_w) // img_w
-            else:
-                new_h = net_h
-                new_w = (img_w * net_h) // img_h
-
-            new_h = new_h.astype(np.float32)
-            new_w = new_w.astype(np.float32)
-            net_h = net_h.astype(np.float32)
-            net_w = net_w.astype(np.float32)
-
-            x = (x - (net_w - new_w)/np.float32(2.)/net_w) / (new_w/net_w)
-            y = (y - (net_h - new_h)/np.float32(2.)/net_h) / (new_h/net_h)
-            w *= (net_w / new_w)
-            h *= (net_h / new_h)
-
-        x *= img_w
-        w *= img_w
-        y *= img_h
-        h *= img_h
-
-        return (x, y, w, h)
-
-
     boxes = []
 
     net_dim = np.array([*net_dim], dtype=np.int32)
     img_dim = np.array([*img_dim], dtype=np.int32)
 
     for l_out in output:
-        x = l_out[...,0:1]
-        y = l_out[...,1:2]
-        w = l_out[...,2:3]
-        h = l_out[...,3:4]
-        objectness = l_out[...,4:5]
-        classes = l_out[..., 5:]
+        objectness = l_out[...,4]
+        detections = l_out[objectness >= thresh]
 
-        got_obj = np.squeeze(objectness >= thresh, axis=3)
-        x, y, w, h, objectness, classes = [a[got_obj] for a in [x, y, w, h, objectness, classes]]
-
-        x, y, w, h = _correct_boxes((x, y, w, h), img_dim, net_dim)
+        objectness = detections[...,4:5]
+        classes = detections[..., 5:]
 
         classes *= objectness
         classes[classes < thresh] = 0
 
-        boxes += d2k.box.boxes_from_array(np.concatenate([x, y, w, h, objectness, classes], axis=1))
+        d2k.box.letterbox_transform(detections, net_dim, img_dim, reverse=True)
+
+        xy = detections[...,0:2]
+        wh = detections[...,2:4]
+
+        xy *= img_dim
+        wh *= img_dim
+
+        boxes.extend(d2k.box.boxes_from_array(detections))
 
     return boxes
 
@@ -577,7 +537,7 @@ def detect_image(model, image, thresh=.5, iou_thresh=.5):
     net_h, net_w = model.layers[0].input_shape[0][1:3]
     img_h, img_w = image.shape[0:2]
 
-    image = d2k.image.letterbox(image, net_w, net_h, resize_with_pil=False)
+    image = d2k.image.letterbox(image, net_w, net_h)
 
     output = model.predict(np.expand_dims(image, axis=0))
     output = [x.squeeze(axis=0) for x in output]
