@@ -26,7 +26,8 @@ if (args.image_file != None and not args.print and saved_model.exists()):
     model = keras.models.load_model(saved_model)
 else:
     network = d2k.network.load(Path(f'darknet-files/yolov{args.version}.cfg').read_text())
-    model = network.make_model(Path(f'darknet-files/yolov{args.version}.weights').read_bytes())
+    network.read_darknet_weights(Path(f'darknet-files/yolov{args.version}.weights').read_bytes())
+    model = network.make_model()
 
     if (args.print):
         print('\n'.join(network.convert()), '\n')

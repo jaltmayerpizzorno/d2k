@@ -160,6 +160,7 @@ class Network:
         __class__._check_config(config)
         self.config = config
         self._output_shapes = None
+        self._weights = None
 
 
     @staticmethod
@@ -404,8 +405,12 @@ class Network:
         return net
 
 
-    def _read_weights(self, weights_blob):
-        """Reads Darknet weights into a dictionary for later loading into the Keras model created by this network."""
+    def read_darknet_weights(self, weights_blob):
+        """Reads in Darknet weights for inclusion in Keras models created by this Network.
+
+           Arguments:
+           weights_blob -- darknet weights to read in, as a binary string
+        """
 
         class BinaryReader:
             def __init__(self, buffer):
@@ -482,16 +487,15 @@ class Network:
             out_dim[i] = in_dim
 
         assert r.at_eof()
-        return weights
+        self._weights = weights
 
 
-    def make_model(self, weights_blob=None, decode_grid=True):
+    def make_model(self, decode_grid=True):
         """Returns a Keras model equivalent to this Network.
 
            Raises ConversionError in case of errors.
 
            Arguments:
-           weights_blob -- darknet weights to load into model, as a binary string
            decode_grid -- decode box coordinates from YOLO layers' grids.  Turn off to facilitate
                           comparing with Darknet (default: True)
         """
@@ -504,10 +508,9 @@ class Network:
         exec('\n'.join(self.convert(decode_grid=decode_grid)), g, l)
         model = keras.Model(l['layer_in'], l['layer_out'])
 
-        if weights_blob != None:
-            weights = self._read_weights(weights_blob)
-            for l in weights:
-                model.get_layer(l).set_weights(weights[l])
+        if self._weights != None:
+            for l in self._weights:
+                model.get_layer(l).set_weights(self._weights[l])
 
         return model
 

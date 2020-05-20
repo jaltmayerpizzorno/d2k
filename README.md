@@ -38,8 +38,9 @@ python yolo.py tests/data/dog.png
 
 In Python, using it is as simple as, for example,
 ```python
-network = d2k.network.load(Path('darknet-files/yolov3.cfg').read_text())
-model = network.make_model(Path('darknet-files/yolov3.weights').read_bytes())
+net = d2k.network.load(Path('darknet-files/yolov3.cfg').read_text())
+net.read_darknet_weights(Path('darknet-files/yolov3.weights').read_bytes())
+model = net.make_model()
 image = d2k.image.load(image_file)
 boxes = d2k.network.detect_image(model, image)
 

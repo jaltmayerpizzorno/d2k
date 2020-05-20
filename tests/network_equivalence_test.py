@@ -104,7 +104,8 @@ def make_networks(tmp_path, cfg_text, identity=False):
 
     ww = DummyWeightsWriter(network.config, identity=identity)
 
-    k = network.make_model(ww.get_weights(), decode_grid=False)
+    network.read_darknet_weights(ww.get_weights())
+    k = network.make_model(decode_grid=False)
 
     cfg_file.write_text(cfg_text)
     weights_file.write_bytes(ww.get_weights())
@@ -137,7 +138,7 @@ def compare_dn_to_keras(tmp_path, cfg_text, decimal=8):
         assert not np.isnan(k_out).any()
 
 
-def test_read_weights_not_0_2(tmp_path):
+def test_read_darknet_weights_not_0_2(tmp_path):
     cfg_text = '\n'.join([
         "[net]",
         "height=3",
@@ -157,7 +158,7 @@ def test_read_weights_not_0_2(tmp_path):
     ww = DummyWeightsWriter(network.config, version_0_2=False)
 
     with pytest.raises(d2k.network.ConversionError):
-        network.make_model(ww.get_weights())
+        network.read_darknet_weights(ww.get_weights())
 
 
 # size=1 stride>1 not supported by darknet
@@ -504,7 +505,8 @@ def test_yolo_network(image_stem, yolo):
     _, dn_output, _, _ = darknet_compute(yolo, image_file)
 
     network = d2k.network.load((darknet_files / (yolo + '.cfg')).read_text())
-    k = network.make_model((darknet_files / (yolo + '.weights')).read_bytes(), decode_grid=False)
+    network.read_darknet_weights((darknet_files / (yolo + '.weights')).read_bytes())
+    k = network.make_model(decode_grid=False)
 
     net_h, net_w, _ = network.input_shape()
 
@@ -530,7 +532,8 @@ def test_end_to_end(image_stem, yolo, use_detect_image):
     _, _, _, dn_boxes = darknet_compute(yolo, image_file)
 
     network = d2k.network.load((darknet_files / (yolo + '.cfg')).read_text())
-    k = network.make_model((darknet_files / (yolo + '.weights')).read_bytes())
+    network.read_darknet_weights((darknet_files / (yolo + '.weights')).read_bytes())
+    k = network.make_model()
 
     image = d2k.image.load(image_file)
 
