@@ -1375,3 +1375,156 @@ def test_convert_yolov4_doesnt_throw():
         cfg = f.read()
 
     d2k.network.load(cfg).convert()
+
+
+@pytest.mark.parametrize("i", [-2, 1, 2])
+def test_layer_output_shape_out_of_range(i):
+    cfg_text = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=150",
+        "channels=3",
+        "",
+        "[convolutional]",
+    ])
+
+    network = d2k.network.load(cfg_text)
+
+    with pytest.raises(IndexError):
+        network.layer_output_shape(i)
+
+
+def compare_layer_output_shape(cfg_text):
+    network = d2k.network.load(cfg_text)
+    k = network.make_model()
+    assert network.layer_output_shape(-1) == k.output_shape[1:] # skipping batch dim
+
+
+@pytest.mark.parametrize("size, stride", [(1,1),(2,1),(2,2),(3,1),(3,2)])
+@pytest.mark.parametrize("pad", [0,1])
+@pytest.mark.parametrize("bn", [0,1])
+def test_layer_output_shape_convolutional(size, stride, pad, bn):
+    cfg_text = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=150",
+        "channels=3",
+        "",
+        "[convolutional]",
+        f"batch_normalize={bn}",
+        "filters=2",
+        f"size={size}",
+        f"stride={stride}",
+        f"pad={pad}",
+        f"activation=linear",
+    ])
+
+    compare_layer_output_shape(cfg_text)
+
+
+def test_layer_output_shape_route():
+    cfg_text = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=200",
+        "channels=3",
+        "",
+        "[convolutional]",
+        "pad=1",
+        "activation=linear",
+        "",
+        "[convolutional]",
+        "pad=1",
+        "activation=linear",
+        "",
+        "[convolutional]",
+        "pad=1",
+        "activation=linear",
+        "",
+        "[route]",
+        "layers=-1, -3"
+    ])
+
+    compare_layer_output_shape(cfg_text)
+
+
+def test_layer_output_shape_shortcut():
+    cfg_text = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=200",
+        "channels=3",
+        "",
+        "[convolutional]",
+        "pad=0",
+        "activation=linear",
+        "",
+        "[convolutional]",
+        "pad=0",
+        "activation=linear",
+        "",
+        "[convolutional]",
+        "pad=0",
+        "activation=linear",
+        "",
+        "[shortcut]",
+        "from=-3"
+    ])
+
+    compare_layer_output_shape(cfg_text)
+
+
+@pytest.mark.parametrize("stride", [1, 2, 3])
+def test_layer_output_shape_upsample(stride):
+    cfg_text = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=200",
+        "channels=3",
+        "",
+        "[upsample]",
+        f"stride={stride}",
+    ])
+
+    compare_layer_output_shape(cfg_text)
+
+
+@pytest.mark.parametrize("stride", [1, 2, 3, 5, 7])
+@pytest.mark.parametrize("size", [2, 3, 4, 5, 7])
+@pytest.mark.parametrize("padding", [None, 0, 2, 3])
+def test_layer_output_shape_maxpool(stride, size, padding):
+    cfg_text = '\n'.join([
+        "[net]",
+        "height=100",
+        "width=150",
+        "channels=3",
+        "",
+        "[maxpool]",
+        f"stride={stride}",
+        f"size={size}",
+        f"{f'padding={padding}' if padding != None else ''}"
+    ])
+
+    compare_layer_output_shape(cfg_text)
+
+
+@pytest.mark.parametrize("size", [2, 10, 20])
+@pytest.mark.parametrize("classes", [3, 20])
+@pytest.mark.parametrize("mask", [range(0,3), range(2,7), range(0,9)])
+def test_layer_output_shape_yolo(size, classes, mask):
+    height = size 
+    width = size
+    cfg_text = '\n'.join([
+        "[net]",
+        f"height={height}",
+        f"width={width}",
+        f"channels={(4+1+classes)*len(mask)}",
+        "",
+        "[yolo]",
+        f"classes={classes}",
+        "num=9",
+        f"mask={','.join([str(x) for x in mask])}",
+        "anchors = 10,13,  16,30,  33,23,  30,61,  62,45,  59,119,  116,90,  156,198,  373,326",
+    ])
+
+    compare_layer_output_shape(cfg_text)

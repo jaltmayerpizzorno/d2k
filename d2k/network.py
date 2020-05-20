@@ -159,6 +159,7 @@ class Network:
     def __init__(self, config):
         __class__._check_config(config)
         self.config = config
+        self._output_shapes = None
 
 
     @staticmethod
@@ -179,6 +180,63 @@ class Network:
         """Returns this Network's input shape."""
         net_options = self.config[0][1]
         return (net_options['height'], net_options['width'], net_options['channels'])
+
+
+    def layer_output_shape(self, i):
+        """Returns the output shape of a layer in this Network.
+
+           Arguments:
+           i -- layer number, as an array index
+        """
+
+        if self._output_shapes == None:
+            self._output_shapes = []
+            shape = self.input_shape()
+            for (section, options) in self.config[1:]:
+                if section == '[convolutional]':
+                    filters = int(options['filters'])
+                    size = int(options['size'])
+                    stride = int(options['stride'])
+                    padding = int(options['pad']) * size // 2
+
+                    assert len(shape) == 3, "invalid input shape"
+                    shape = (1+(shape[0]-size+2*padding)//stride, 1+(shape[1]-size+2*padding)//stride, filters)
+
+                elif section == '[route]':
+                    layers = options['layers']
+
+                    shape = (*self._output_shapes[layers[0]][:-1], sum([self._output_shapes[l][-1] for l in layers]))
+
+                elif section == '[shortcut]':
+                    shape = self._output_shapes[options['from']]
+
+                elif section == '[upsample]':
+                    stride = options['stride']
+
+                    assert len(shape) == 3, "invalid input shape"
+                    shape = (shape[0]*stride, shape[1]*stride, shape[2])
+
+                elif section == '[maxpool]':
+                    stride = options['stride']
+                    size = options['size']
+                    padding = options['padding']
+
+                    assert len(shape) == 3, "invalid input shape"
+                    shape = (1+(shape[0]+padding-size)//stride, 1+(shape[1]+padding-size)//stride, shape[2])
+
+                elif section == '[yolo]':
+                    classes = options['classes']
+                    mask = options['mask']
+
+                    assert len(shape) == 3, "invalid input shape"
+                    shape = (*shape[:2], len(mask), 4+1+classes)
+
+                else:
+                    raise ConversionError(f'Unsupported section {section}')
+
+                self._output_shapes.append(shape)
+
+        return self._output_shapes[i]
 
 
     def convert(self, decode_grid=True):
