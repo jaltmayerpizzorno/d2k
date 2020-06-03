@@ -23,7 +23,7 @@ from PIL import Image
 
 if (args.image_file != None and not args.print and saved_model.exists()):
     import tensorflow.keras as keras
-    model = keras.models.load_model(saved_model)
+    model = keras.models.load_model(saved_model, compile=False)
 else:
     network = d2k.network.load(Path(f'darknet-files/yolov{args.version}.cfg').read_text())
     network.read_darknet_weights(Path(f'darknet-files/yolov{args.version}.weights').read_bytes())
