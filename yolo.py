@@ -5,8 +5,8 @@ from pathlib import Path
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # only error messages, please
 
 argparser = argparse.ArgumentParser()
-argparser.add_argument('--version', type=int, help='select the YOLO version',
-                       choices=[3, 4], default=3)
+argparser.add_argument('--version', type=str, help='select the YOLO version',
+                       choices=['3', '3-tiny', '4'], default='3')
 argparser.add_argument('--save', help='save the model as an .h5 file', action='store_true')
 argparser.add_argument('--print', help='print generated model', action='store_true')
 argparser.add_argument('image_file', type=str, nargs='?', help='image to process')

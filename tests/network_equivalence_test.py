@@ -13,6 +13,7 @@ darknet_files = Path('darknet-files')
 
 # assume YOLOv4 requirements supported if this file exists
 darknet_has_yolov4 = Path('darknet/cfg/yolov4.cfg').exists()
+has_yolov3_tiny = Path('darknet-files/yolov3-tiny.weights').exists()
 
 
 def setup_function():
@@ -467,7 +468,8 @@ def darknet_compute(cfg_file, image_file):
 
 
 @pytest.mark.parametrize("image_stem", ['zebra', 'dog', 'cats'])
-@pytest.mark.parametrize("yolo", ['yolov3'] + (['yolov4'] if darknet_has_yolov4 else []))
+@pytest.mark.parametrize("yolo", ['yolov3'] + (['yolov3-tiny'] if has_yolov3_tiny else []) \
+                                 + (['yolov4'] if darknet_has_yolov4 else []))
 def test_boxes_from_darknet_output(image_stem, yolo):
     image, dn_output, dn_boxes, _ = darknet_compute(yolo, test_data_path / (image_stem + '.png'))
 
@@ -499,7 +501,8 @@ def test_nms_from_darknet_boxes(image_stem):
 
 
 @pytest.mark.parametrize("image_stem", ['zebra', 'dog', 'cats'])
-@pytest.mark.parametrize("yolo", ['yolov3'] + (['yolov4'] if darknet_has_yolov4 else []))
+@pytest.mark.parametrize("yolo", ['yolov3'] + (['yolov3-tiny'] if has_yolov3_tiny else []) \
+                                 + (['yolov4'] if darknet_has_yolov4 else []))
 def test_yolo_network(image_stem, yolo):
     image_file = test_data_path / (image_stem + '.png')
     _, dn_output, _, _ = darknet_compute(yolo, image_file)
@@ -525,7 +528,8 @@ def test_yolo_network(image_stem, yolo):
 
 
 @pytest.mark.parametrize("image_stem", ['zebra', 'dog', 'cats'])
-@pytest.mark.parametrize("yolo", ['yolov3'] + (['yolov4'] if darknet_has_yolov4 else []))
+@pytest.mark.parametrize("yolo", ['yolov3'] + (['yolov3-tiny'] if has_yolov3_tiny else []) \
+                                 + (['yolov4'] if darknet_has_yolov4 else []))
 @pytest.mark.parametrize("use_detect_image", [False, True])
 def test_end_to_end(image_stem, yolo, use_detect_image):
     image_file = test_data_path / (image_stem + '.png')
