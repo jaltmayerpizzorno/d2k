@@ -24,9 +24,8 @@ if you have [Git LFS](https://git-lfs.github.com/) set up, cloning the repositor
 should get you copies.  Otherwise, after cloning you'll need to get it from the
 Darknet site:
 ```bash
-pushd darknet-files
 wget https://pjreddie.com/media/files/yolov3.weights
-popd
+mv yolov3.weights darknet-files/
 ```
 See [the YOLOv4 GitHub page](https://github.com/AlexeyAB/darknet) for where to
 download the yolov4 weights.
